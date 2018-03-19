@@ -2,8 +2,8 @@
  * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com>
  */
 
-
 #include "tlog.h"
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -22,6 +22,11 @@
 #define TLOG_TMP_LEN 128
 #define TLOG_LOG_SIZE (1024 * 1024 * 50)
 #define TLOG_LOG_COUNT 32
+
+struct oldest_log {
+    char name[TLOG_TMP_LEN];
+    time_t mtime;
+};
 
 struct tlog {
     char *buff;
@@ -46,6 +51,8 @@ struct tlog {
     int block;
     int dropped;
 };
+
+typedef int (*list_callback)(const char *name, struct dirent *entry, void *user);
 
 struct tlog tlog;
 tlog_format_func tlog_format;
@@ -98,7 +105,7 @@ static int _tlog_mkdir(const char *path)
     return 0;
 }
 
-static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file) 
+static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
 {
     time_t rawtime;
     struct tm tm;
@@ -112,7 +119,7 @@ static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
         return -1;
     }
 
-    log_mtime->year  = tm.tm_year + 1900;
+    log_mtime->year = tm.tm_year + 1900;
     log_mtime->mon = tm.tm_mon + 1;
     log_mtime->mday = tm.tm_mday;
     log_mtime->hour = tm.tm_hour;
@@ -137,7 +144,7 @@ static int _tlog_gettime(struct tlog_time *cur_time)
         return -1;
     }
 
-    cur_time->year  = tm.tm_year + 1900;
+    cur_time->year = tm.tm_year + 1900;
     cur_time->mon = tm.tm_mon + 1;
     cur_time->mday = tm.tm_mday;
     cur_time->hour = tm.tm_hour;
@@ -154,7 +161,7 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     int total_len = 0;
     struct tlog_time *tm = &info->time;
 
-    len = snprintf(buff, maxlen, "%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.3d|%4s|%15s:%-4d|%15s| ", 
+    len = snprintf(buff, maxlen, "%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.3d|%4s|%15s:%-4d|%15s| ",
         tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
         info->level, info->file, info->line, info->func);
     if (len < 0 || len == maxlen) {
@@ -190,7 +197,7 @@ static int _tlog_log_buffer(char *buff, int maxlen, tlog_level level, const char
     info.line = line;
     info.func = func;
     info.level = tlog_level_str[level];
-    
+
     if (_tlog_gettime(&info.time) != 0) {
         return -1;
     }
@@ -273,8 +280,8 @@ static int _tlog_rename_logfile(const char *gzip_file)
         return -1;
     }
 
-    snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d.gz", 
-        tlog.logdir, tlog.logname, logtime.year, logtime.mon, logtime.mday, 
+    snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d.gz",
+        tlog.logdir, tlog.logname, logtime.year, logtime.mon, logtime.mday,
         logtime.hour, logtime.min, logtime.sec);
 
     if (rename(gzip_file, archive_file) != 0) {
@@ -284,9 +291,112 @@ static int _tlog_rename_logfile(const char *gzip_file)
     return 0;
 }
 
+static int _tlog_list_dir(const char *path, list_callback callback, void *userptr)
+{
+    DIR *dir = NULL;
+    struct dirent *ent;
+    struct dirent entsave;
+    int ret = 0;
+
+    dir = opendir(path);
+    if (dir == NULL) {
+        fprintf(stderr, "open directory failed, %s\n", strerror(errno));
+        goto errout;
+    }
+
+    while (readdir_r(dir, &entsave, &ent) == 0 && ent != NULL) {
+        if (strncmp(".", ent->d_name, 2) == 0 || strncmp("..", ent->d_name, 3) == 0) {
+            continue;
+        }
+        ret = callback(path, ent, userptr);
+        if (ret != 0) {
+            goto errout;
+        }
+    }
+
+    closedir(dir);
+    return 0;
+errout:
+    if (dir) {
+        closedir(dir);
+        dir = NULL;
+    }
+    return -1;
+}
+
+static int _tlog_count_log_callback(const char *path, struct dirent *entry, void *userptr)
+{
+    int *lognum = (int *)userptr;
+    int len = strnlen(tlog.logname, sizeof(tlog.logname));
+
+    if (strncmp(tlog.logname, entry->d_name, len) != 0) {
+        return 0;
+    }
+
+    (*lognum)++;
+    return 0;
+}
+
+static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, void *userptr)
+{
+    struct stat sb;
+    char filename[PATH_MAX];
+    struct oldest_log *oldestlog = userptr;
+
+    int len = strnlen(tlog.logname, sizeof(tlog.logname));
+
+    if (strncmp(tlog.logname, entry->d_name, len) != 0) {
+        return 0;
+    }
+
+    snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
+
+    if (stat(filename, &sb) != 0) {
+        return -1;
+    }
+
+    if (oldestlog->mtime == 0 || oldestlog->mtime > sb.st_mtime) {
+        oldestlog->mtime = sb.st_mtime;
+        strncpy(oldestlog->name, entry->d_name, sizeof(oldestlog->name));
+        return 0;
+    }
+
+    return 0;
+}
+
+static int _tlog_remove_oldestlog(void)
+{
+    struct oldest_log oldestlog;
+    oldestlog.name[0] = 0;
+    oldestlog.mtime = 0;
+
+    if (_tlog_list_dir(tlog.logdir, _tlog_get_oldest_callback, &oldestlog) != 0) {
+        return -1;
+    }
+
+    char filename[PATH_MAX];
+    snprintf(filename, sizeof(filename), "%s/%s", tlog.logdir, oldestlog.name);
+
+    unlink(filename);
+
+    return 0;
+}
+
 static int _tlog_remove_oldlog(void)
 {
+    int lognum = 0;
+    int i = 0;
 
+    if (_tlog_list_dir(tlog.logdir, _tlog_count_log_callback, &lognum) != 0) {
+        fprintf(stderr, "get log file count failed.\n");
+        return -1;
+    }
+
+    for (i = 0; i < lognum - tlog.logcount; i++) {
+        _tlog_remove_oldestlog();
+    }
+
+    return 0;
 }
 
 static void _tlog_archive_log(void)
@@ -318,10 +428,6 @@ static int _tlog_write_log(char *buff, int bufflen)
 {
     int len;
 
-    if (tlog.filesize <= 0 && tlog.fd > 0) {
-        tlog.filesize = lseek(tlog.fd , 0, SEEK_END);
-    }
-
     if (tlog.filesize > tlog.logsize) {
         _tlog_archive_log();
         close(tlog.fd);
@@ -342,6 +448,8 @@ static int _tlog_write_log(char *buff, int bufflen)
             fprintf(stderr, "open log file %s failed, %s\n", logfile, strerror(errno));
             return -1;
         }
+
+        tlog.filesize = lseek(tlog.fd, 0, SEEK_END);
     }
 
     len = write(tlog.fd, buff, bufflen);

@@ -16,7 +16,7 @@ void *test(void *arg)
 
 int main(int argc, char *argv[])
 {
-    tlog_init("./a", "a.log", 4096, 10, 0, 0);
+    tlog_init("./log", "test.log", 1024 * 1024 * 5, 10, 0, 0);
     pthread_attr_t attr;
     pthread_t threads[10];
     int i;
