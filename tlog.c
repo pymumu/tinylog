@@ -559,7 +559,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     pthread_mutex_init(&tlog.lock, 0);
     pthread_cond_init(&tlog.cond, 0);
     pthread_cond_init(&tlog.client_cond, 0);
-    tlog.buff = malloc(TLOG_BUFF_SIZE);
+    tlog.buff = malloc(tlog.buffsize);
     if (tlog.buff == NULL) {
         fprintf(stderr, "malloc tlog buffer failed, %s\n", strerror(errno));
         goto errout;
