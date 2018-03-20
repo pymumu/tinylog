@@ -25,7 +25,7 @@ Usage
 ==============
 1. Include the log header file `tlog.h` in the C code.
 2. Call `tlog_init` to initialize the log module.
-3. Call log output function output log.
+3. Call `tlog` output function output log.
 4. Call `tlog_exit` to exit the shutdown log component.
 
 Example
