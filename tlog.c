@@ -161,7 +161,7 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     int total_len = 0;
     struct tlog_time *tm = &info->time;
 
-    len = snprintf(buff, maxlen, "%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.3d|%4s|%15s:%-4d|%15s| ",
+    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.3d][%4s][%15s:%-4d][%15s] ",
         tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
         info->level, info->file, info->line, info->func);
     if (len < 0 || len == maxlen) {
