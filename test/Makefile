@@ -1,7 +1,7 @@
 OBJS = test.o ../tlog.o
 
 BIN = test
-CFLAGS = -g -O0 -I../
+CFLAGS = -Wall -g -O0 -I../
 LIBS = -lpthread
 
 .PHONY : all
