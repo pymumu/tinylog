@@ -1,10 +1,11 @@
-Tiny Log
+Tiny-Log
 ==============
 
-Tiny log is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
+[中文REAMDME请看这里](README_zh-CN.md)
 
-Support for log archiving, multithreading concurrent write log support, non-blocking log.
-Characteristics
+Tiny-log is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
+
+Support for log archiving, multithreading writing, non-blocking mode.  
 
 Features
 --------------
@@ -14,7 +15,7 @@ Features
 4. non-blocking log.
 5. Multithreading concurrent write.
 
-Useage
+Usage
 ==============
 1. Include the log header file `tlog.h` in the C code.
 2. Call `tlog_init` to initialize the log module.
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
 API description
 ----------------
 1. int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);    
-Function：Initialize log module
+Function：Initialize log module  
 logdir: Log Output path.    
 logname: Log name.  
 maxlogsize: The maximum size of a single log file.    
