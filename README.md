@@ -7,12 +7,18 @@ Tiny-log is a lightweight C-language log component for UNIX environment that pro
 
 Support for log archiving, multithreading writing, non-blocking mode.  
 
+output example:
+```
+[2018-03-20 10:40:12.855][INFO][      example.c:7   ][           main] This is a log message.
+```
+
+
 Features
 --------------
-1. Log compressed archive.
+1. Log to compressed archive file.
 2. Log level output.
 3. log format customization.
-4. non-blocking log.
+4. non-blocking log mode.
 5. Multithreading concurrent write.
 
 Usage
