@@ -1,6 +1,6 @@
 OBJS = example.o ../tlog.o
 BIN = example
-CFLAGS = -g -O0 -I../
+CFLAGS = -Wall -g -O0 -I../
 LIBS = -lpthread
 
 .PHONY : all

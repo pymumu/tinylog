@@ -55,6 +55,7 @@ struct tlog {
 typedef int (*list_callback)(const char *name, struct dirent *entry, void *user);
 
 struct tlog tlog;
+static tlog_level tlog_set_level = TLOG_INFO;
 tlog_format_func tlog_format;
 static const char *tlog_level_str[] = {
     "DBG",
@@ -107,7 +108,6 @@ static int _tlog_mkdir(const char *path)
 
 static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
 {
-    time_t rawtime;
     struct tm tm;
     struct stat sb;
 
@@ -132,7 +132,6 @@ static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
 
 static int _tlog_gettime(struct tlog_time *cur_time)
 {
-    time_t rawtime;
     struct tm tm;
     struct timeval tmval;
 
@@ -161,7 +160,7 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     int total_len = 0;
     struct tlog_time *tm = &info->time;
 
-    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d.%.3d][%4s][%15s:%-4d][%15s] ",
+    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%15s:%-4d][%15s] ",
         tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
         info->level, info->file, info->line, info->func);
     if (len < 0 || len == maxlen) {
@@ -206,7 +205,7 @@ static int _tlog_log_buffer(char *buff, int maxlen, tlog_level level, const char
     return len;
 }
 
-int tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap)
+int _tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap)
 {
     int len;
     int maxlen = 0;
@@ -264,8 +263,12 @@ int tlog_ext(tlog_level level, const char *file, int line, const char *func, voi
     int len;
     va_list ap;
 
+    if (level < tlog_set_level) {
+        return 0;
+    }
+
     va_start(ap, format);
-    len = tlog_vext(level, file, line, func, userptr, format, ap);
+    len = _tlog_vext(level, file, line, func, userptr, format, ap);
     va_end(ap);
 
     return len;
@@ -524,6 +527,16 @@ static void *_tlog_work(void *arg)
         usleep(20 * 1000);
     }
     return NULL;
+}
+
+int tlog_setlevel(tlog_level level) 
+{
+    if (level >= TLOG_END) {
+        return -1;
+    }
+
+    tlog_set_level = level;
+    return 0;
 }
 
 int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize)
