@@ -6,6 +6,10 @@
 #define TLOG_H
 #include <stdarg.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /*__cplusplus */
+
 typedef enum {
     TLOG_DBG = 0,
     TLOG_INFO = 1,
@@ -45,4 +49,7 @@ extern void tlog_exit(void);
 typedef int (*tlog_format_func)(char *buff, int maxlen, struct tlog_info *info, void *userptr, const char *format, va_list ap);
 extern int tlog_reg_format_func(tlog_format_func func);
 
+#ifdef __cplusplus
+}
+#endif /*__cplusplus */
 #endif // !TLOG_H
