@@ -8,7 +8,7 @@ void *test(void *arg)
     int id = (int)arg;
     int i = 0;
 
-    for (i = 0; i < 1000; i++) {
+    for (i = 0; i < 10000; i++) {
         tlog(TLOG_ERR, "%d i = %d\n", id, i);
     }
     return NULL;
