@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define TLOG_BUFF_SIZE (1024 * 128)
@@ -50,6 +51,7 @@ struct tlog {
     int logcount;
     int block;
     int dropped;
+    int zip_pid;
 };
 
 typedef int (*list_callback)(const char *name, struct dirent *entry, void *user);
@@ -330,8 +332,12 @@ errout:
 static int _tlog_count_log_callback(const char *path, struct dirent *entry, void *userptr)
 {
     int *lognum = (int *)userptr;
-    int len = strnlen(tlog.logname, sizeof(tlog.logname));
 
+    if (strstr(entry->d_name, ".gz") == NULL) {
+        return 0;
+    }
+
+    int len = strnlen(tlog.logname, sizeof(tlog.logname));
     if (strncmp(tlog.logname, entry->d_name, len) != 0) {
         return 0;
     }
@@ -345,6 +351,10 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
     struct stat sb;
     char filename[PATH_MAX];
     struct oldest_log *oldestlog = userptr;
+
+    if (strstr(entry->d_name, ".gz") == NULL) {
+        return 0;
+    }
 
     int len = strnlen(tlog.logname, sizeof(tlog.logname));
 
@@ -402,24 +412,22 @@ static int _tlog_remove_oldlog(void)
     return 0;
 }
 
-static void _tlog_archive_log(void)
+static void _tlog_wait_pid(int wait_hang)
 {
-    char gzip_file[PATH_MAX];
-    char gzip_cmd[PATH_MAX];
-
-    snprintf(gzip_file, sizeof(gzip_file), "%s/%s.gz", tlog.logdir, tlog.logname);
-    if (access(gzip_file, F_OK) == 0) {
-        if (_tlog_rename_logfile(gzip_file) != 0) {
-            return;
-        }
-    }
-
-    snprintf(gzip_cmd, sizeof(gzip_cmd), "gzip -1 %s/%s", tlog.logdir, tlog.logname);
-
-    if (system(gzip_cmd) != 0) {
-        fprintf(stderr, "run %s failed\n", gzip_cmd);
+    int status;
+    if (tlog.zip_pid <= 0) {
         return;
     }
+
+    int option = (wait_hang == 0) ? WNOHANG : 0;
+    if (waitpid(tlog.zip_pid, &status, option) <= 0) {
+        return;
+    }
+
+    tlog.zip_pid = -1;
+    char gzip_file[PATH_MAX];
+
+    snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
     if (_tlog_rename_logfile(gzip_file) != 0) {
         return;
     }
@@ -427,11 +435,50 @@ static void _tlog_archive_log(void)
     _tlog_remove_oldlog();
 }
 
+static void _tlog_archive_log(void)
+{
+    char gzip_file[PATH_MAX];
+    char gzip_cmd[PATH_MAX];
+    char log_file[PATH_MAX];
+    char pending_file[PATH_MAX];
+
+    snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
+    snprintf(pending_file, sizeof(pending_file), "%s/%s.pending", tlog.logdir, tlog.logname);
+
+    if (access(gzip_file, F_OK) == 0) {
+        if (_tlog_rename_logfile(gzip_file) != 0) {
+            return;
+        }
+    }
+
+    if (tlog.zip_pid > 0) {
+        _tlog_wait_pid(0);
+    }
+
+    if (access(pending_file, F_OK) != 0) {
+        snprintf(log_file, sizeof(log_file), "%s/%s", tlog.logdir, tlog.logname);
+        if (rename(log_file, pending_file) != 0) {
+            return;
+        }
+    }
+
+    snprintf(gzip_cmd, sizeof(gzip_cmd), "gzip -1 %s", pending_file);
+
+    if (tlog.zip_pid <= 0) {
+        int pid = vfork();
+        if (pid == 0) {
+            execl("/bin/sh", "sh", "-c", gzip_cmd, NULL);
+            _exit(0);
+        }
+        tlog.zip_pid = pid;
+    }
+}
+
 static int _tlog_write_log(char *buff, int bufflen)
 {
     int len;
 
-    if (tlog.filesize > tlog.logsize) {
+    if (tlog.filesize > tlog.logsize && tlog.zip_pid <=0) {
         _tlog_archive_log();
         close(tlog.fd);
         tlog.fd = -1;
@@ -472,6 +519,7 @@ static void *_tlog_work(void *arg)
     int log_extend;
     int i;
     int log_dropped;
+    struct timespec tm;
 
     while (tlog.run || tlog.end != tlog.start || tlog.ext_end > 0) {
         log_len = 0;
@@ -481,9 +529,15 @@ static void *_tlog_work(void *arg)
 
         pthread_mutex_lock(&tlog.lock);
         if (tlog.end == tlog.start && tlog.ext_end == 0) {
-            ret = pthread_cond_wait(&tlog.cond, &tlog.lock);
-            if (ret < 0) {
+            clock_gettime(CLOCK_REALTIME, &tm);
+            tm.tv_sec += 5;
+            ret = pthread_cond_timedwait(&tlog.cond, &tlog.lock, &tm);
+            if (ret < 0 || ret == ETIMEDOUT) {
                 pthread_mutex_unlock(&tlog.lock);
+                if (ret == ETIMEDOUT) {
+                    _tlog_wait_pid(0);
+                    continue;
+                }
                 sleep(1);
                 continue;
             }
@@ -529,7 +583,7 @@ static void *_tlog_work(void *arg)
     return NULL;
 }
 
-int tlog_setlevel(tlog_level level) 
+int tlog_setlevel(tlog_level level)
 {
     if (level >= TLOG_END) {
         return -1;
@@ -567,6 +621,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.logcount = (maxlogcount > 0) ? maxlogcount : TLOG_LOG_COUNT;
     tlog.fd = -1;
     tlog.filesize = 0;
+    tlog.zip_pid = -1;
 
     pthread_attr_init(&attr);
     pthread_mutex_init(&tlog.lock, 0);
@@ -617,6 +672,10 @@ void tlog_exit(void)
         pthread_cond_signal(&tlog.cond);
         pthread_mutex_unlock(&tlog.lock);
         pthread_join(tlog.tid, &ret);
+    }
+
+    if (tlog.zip_pid > 0) {
+        _tlog_wait_pid(1);
     }
 
     if (tlog.buff) {
