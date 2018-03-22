@@ -176,7 +176,13 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     if (len < 0 || len == maxlen) {
         return -1;
     }
+	buff += len;
     total_len += len;
+    
+	if (*(buff - 1) != '\n' && total_len + 1 < maxlen) {
+		*buff = '\n';
+		total_len++;
+	}
 
     return total_len;
 }
@@ -451,10 +457,6 @@ static void _tlog_archive_log(void)
         }
     }
 
-    if (tlog.zip_pid > 0) {
-        _tlog_wait_pid(0);
-    }
-
     if (access(pending_file, F_OK) != 0) {
         snprintf(log_file, sizeof(log_file), "%s/%s", tlog.logdir, tlog.logname);
         if (rename(log_file, pending_file) != 0) {
@@ -520,12 +522,22 @@ static void *_tlog_work(void *arg)
     int i;
     int log_dropped;
     struct timespec tm;
+	time_t now = time(0);
+	time_t last = now;
 
     while (tlog.run || tlog.end != tlog.start || tlog.ext_end > 0) {
         log_len = 0;
         log_end = 0;
         log_extlen = 0;
         log_extend = 0;
+
+		if (tlog.zip_pid > 0) {
+			now = time(0);
+			if (now != last) {
+				_tlog_wait_pid(0);
+				last = now;
+			}
+		}
 
         pthread_mutex_lock(&tlog.lock);
         if (tlog.end == tlog.start && tlog.ext_end == 0) {
