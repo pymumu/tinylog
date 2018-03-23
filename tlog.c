@@ -176,13 +176,13 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     if (len < 0 || len == maxlen) {
         return -1;
     }
-	buff += len;
+    buff += len;
     total_len += len;
     
-	if (*(buff - 1) != '\n' && total_len + 1 < maxlen) {
-		*buff = '\n';
-		total_len++;
-	}
+    if (*(buff - 1) != '\n' && total_len + 1 < maxlen) {
+        *buff = '\n';
+        total_len++;
+    }
 
     return total_len;
 }
@@ -481,10 +481,10 @@ static int _tlog_write_log(char *buff, int bufflen)
     int len;
 
     if (tlog.filesize > tlog.logsize && tlog.zip_pid <=0) {
-        _tlog_archive_log();
         close(tlog.fd);
         tlog.fd = -1;
         tlog.filesize = 0;
+        _tlog_archive_log();
     }
 
     if (tlog.fd <= 0) {
@@ -522,8 +522,8 @@ static void *_tlog_work(void *arg)
     int i;
     int log_dropped;
     struct timespec tm;
-	time_t now = time(0);
-	time_t last = now;
+    time_t now = time(0);
+    time_t last = now;
 
     while (tlog.run || tlog.end != tlog.start || tlog.ext_end > 0) {
         log_len = 0;
@@ -531,13 +531,13 @@ static void *_tlog_work(void *arg)
         log_extlen = 0;
         log_extend = 0;
 
-		if (tlog.zip_pid > 0) {
-			now = time(0);
-			if (now != last) {
-				_tlog_wait_pid(0);
-				last = now;
-			}
-		}
+        if (tlog.zip_pid > 0) {
+            now = time(0);
+            if (now != last) {
+                _tlog_wait_pid(0);
+                last = now;
+            }
+        }
 
         pthread_mutex_lock(&tlog.lock);
         if (tlog.end == tlog.start && tlog.ext_end == 0) {
