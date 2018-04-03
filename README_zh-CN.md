@@ -64,11 +64,14 @@ format: 日志格式。
 3. tlog_exit（）  
 功能：日志组件退出。  
 
-4. tlog_reg_format_func(tlog_format_func func);  
+4. tlog_reg_format_func(tlog_format_func func)  
 功能：注册自定义格式函数，回调函数定义为：tlog_format_func 
 
-5. int tlog_setlevel(tlog_level level);
-功能：设置日志级别，有效参数为TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.
+5. tlog_setlevel(tlog_level level)  
+功能：设置日志级别，有效参数为TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.  
+
+6. tlog_setlogscreen(int enable)  
+功能：设置日志是否输出到屏幕　  
   
 License
 ===============
