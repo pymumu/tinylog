@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     int ret;
     pthread_attr_init(&attr);
     for (i = 0; i < 10; i++) {
-        ret = pthread_create(&threads[i], &attr, test, (int *)i);
+        ret = pthread_create(&threads[i], &attr, test, (void *)(int)i);
         if (ret != 0) {
             return 1;
         }

@@ -57,6 +57,7 @@ struct tlog {
 typedef int (*list_callback)(const char *name, struct dirent *entry, void *user);
 
 struct tlog tlog;
+static int tlog_logscreen;
 static tlog_level tlog_set_level = TLOG_INFO;
 tlog_format_func tlog_format;
 static const char *tlog_level_str[] = {
@@ -162,9 +163,9 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     int total_len = 0;
     struct tlog_time *tm = &info->time;
 
-    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%15s:%-4d][%15s] ",
+    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%17s:%-4d] ",
         tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
-        info->level, info->file, info->line, info->func);
+        info->level, info->file, info->line);
     if (len < 0 || len == maxlen) {
         return -1;
     }
@@ -504,6 +505,10 @@ static int _tlog_write_log(char *buff, int bufflen)
         tlog.filesize = lseek(tlog.fd, 0, SEEK_END);
     }
 
+    if (tlog_logscreen) {
+        write(STDOUT_FILENO, buff, bufflen);
+    }
+
     len = write(tlog.fd, buff, bufflen);
     if (len > 0) {
         tlog.filesize += len;
@@ -547,7 +552,6 @@ static void *_tlog_work(void *arg)
             if (ret < 0 || ret == ETIMEDOUT) {
                 pthread_mutex_unlock(&tlog.lock);
                 if (ret == ETIMEDOUT) {
-                    _tlog_wait_pid(0);
                     continue;
                 }
                 sleep(1);
@@ -595,6 +599,11 @@ static void *_tlog_work(void *arg)
     return NULL;
 }
 
+void tlog_setlogscreen(int enable)
+{
+    tlog_logscreen = (enable == 1 ) ? 1 : 0;
+}
+
 int tlog_setlevel(tlog_level level)
 {
     if (level >= TLOG_END) {
@@ -621,7 +630,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     }
 
     tlog_format = _tlog_format;
-
+    tlog_logscreen = 0;
     tlog.buffsize = (buffsize > 0) ? buffsize : TLOG_BUFF_SIZE;
     tlog.start = 0;
     tlog.end = 0;
