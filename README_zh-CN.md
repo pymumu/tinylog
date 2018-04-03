@@ -1,12 +1,12 @@
-Tiny-log
+Tinylog
 ==============
-Tiny-log是一个UNIX环境下轻量级的C语言日志组件，提供了常见的日志输出接口，并日志按一定格式输出到日志文件中。
+Tinylog是一个UNIX环境下轻量级的C语言日志组件，提供了常见的日志输出接口，并日志按一定格式输出到日志文件中。
 
 支持日志归档，支持多线程并发写日志，支持非阻塞日志。
 
 日志输出例子
 ```
-[2018-03-20 10:40:12.855][INFO][      example.c:7   ][           main] This is a log message.
+[2018-04-03 21:52:13,485][INFO][        example.c:7   ] This is a log message.
 ```
 
 特性
@@ -39,6 +39,12 @@ int main(int argc, char *argv[])
 }
 ```
 
+如果要让日志中文件名不包含路径，在编译的时候，可指定编译宏BASE_FILE_NAME，在Makefile中可指定如下语句，实现编译时生成短文件名：(例子请参考example的makfile。)
+```
+%.o : %.c
+	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
+```
+
 API说明
 ----------------
 1. int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);    
@@ -59,7 +65,10 @@ format: 日志格式。
 功能：日志组件退出。  
 
 4. tlog_reg_format_func(tlog_format_func func);  
-功能：注册自定义格式函数，回调函数定义为：tlog_format_func  
+功能：注册自定义格式函数，回调函数定义为：tlog_format_func 
+
+5. int tlog_setlevel(tlog_level level);
+功能：设置日志级别，有效参数为TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.
   
 License
 ===============

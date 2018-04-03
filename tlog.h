@@ -41,12 +41,18 @@ Function：Print log
 level: Current log Levels  
 format: Log formats  
 */
-#define tlog(level, format, ...) tlog_ext(level, __FILE__, __LINE__, __func__, 0, format, ##__VA_ARGS__)
+#ifndef BASE_FILE_NAME
+#define BASE_FILE_NAME __FILE__
+#endif
+#define tlog(level, format, ...) tlog_ext(level, BASE_FILE_NAME, __LINE__, __func__, 0, format, ##__VA_ARGS__)
 
 extern int tlog_ext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, ...) __attribute__((format(printf, 6, 7)));
 
 /* set log level */
 extern int tlog_setlevel(tlog_level level);
+
+/* enalbe log to screen */
+extern void tlog_setlogscreen(int enable);
 
 /*
 Function：Initialize log module  

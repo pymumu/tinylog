@@ -1,17 +1,22 @@
-Tiny-Log
+TinyLog
 ==============
 
 [中文REAMDME请看这里](README_zh-CN.md)
 
-Tiny-log is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
+Tinylog is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
 
 Support for log archiving, multithreading writing, non-blocking mode.  
 
 output example:
 ```
-[2018-03-20 10:40:12.855][INFO][      example.c:7   ][           main] This is a log message.
+[2018-04-03 21:52:13,485][INFO][        example.c:7   ] This is a log message.
 ```
 
+If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)
+```
+%.o : %.c
+	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
+```
 
 Features
 --------------
