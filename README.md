@@ -12,12 +12,6 @@ output example:
 [2018-04-03 21:52:13,485][INFO][        example.c:7   ] This is a log message.
 ```
 
-If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)
-```
-%.o : %.c
-	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
-```
-
 Features
 --------------
 1. Log to compressed archive file.
@@ -48,6 +42,12 @@ int main(int argc, char *argv[])
 }
 ```
 
+If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)
+```
+%.o : %.c
+	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
+```
+
 API description
 ----------------
 1. int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);    
@@ -69,7 +69,13 @@ Function：Log component exits
 
 4. tlog_reg_format_func(tlog_format_func func)  
 Function：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
-  
+
+5. tlog_setlevel(tlog_level level);
+Function：Set log level，valid level are :TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.
+
+6. tlog_setlogscreen(int enable)
+Function：set whether to log is output to screen.
+
 License
 ===============
 MIT License
