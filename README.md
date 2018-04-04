@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 }
 ```
 
-If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)
+If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)  
 For makefile  
 ```
 %.o : %.c
