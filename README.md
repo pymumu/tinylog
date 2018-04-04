@@ -43,9 +43,16 @@ int main(int argc, char *argv[])
 ```
 
 If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)
+For makefile  
 ```
 %.o : %.c
 	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
+```
+
+For cmake   
+```
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 ```
 
 API description

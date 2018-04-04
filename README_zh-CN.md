@@ -40,11 +40,17 @@ int main(int argc, char *argv[])
 ```
 
 如果要让日志中文件名不包含路径，在编译的时候，可指定编译宏BASE_FILE_NAME，在Makefile中可指定如下语句，实现编译时生成短文件名：(例子请参考example的makfile。)
+makefile   
 ```
 %.o : %.c
 	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
 ```
 
+cmake   
+```
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
+```
 API说明
 ----------------
 1. int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);    
