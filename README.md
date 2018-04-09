@@ -5,7 +5,7 @@ TinyLog
 
 Tinylog is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
 
-Support for log archiving, multithreading writing, non-blocking mode.  
+Support for log archiving, multithreading writing, multiprocessing writing, non-blocking mode.  
 
 output example:
 ```
@@ -19,12 +19,13 @@ Features
 3. log format customization.
 4. non-blocking log mode.
 5. Multithreading concurrent write.
+6. Multiprcessing concurrent write.
 
 Usage
 ==============
 1. Include the log header file `tlog.h` in the C code.
 2. Call `tlog_init` to initialize the log module.
-3. Call `tlog` output function output log.
+3. Call `tlog` function output log.
 4. Call `tlog_exit` to exit the shutdown log component.
 
 Example
@@ -83,6 +84,9 @@ Function：Set log level，valid level are :TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG
 6. tlog_setlogscreen(int enable)  
 Function：set whether the log is output to screen.  
 
+7. tlog_setmultiwriter(int enable)  
+Function：set whether enable multiprocessing write mode.   
+  
 License
 ===============
 MIT License
