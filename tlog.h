@@ -54,6 +54,11 @@ extern int tlog_setlevel(tlog_level level);
 /* enalbe log to screen */
 extern void tlog_setlogscreen(int enable);
 
+/* enable multi writer 
+ * NOTICE: maxlogsize in all prcesses must be same.
+ */
+extern void tlog_setmultiwriter(int enable);
+
 /*
 Function：Initialize log module  
 logdir: Log Output path.    

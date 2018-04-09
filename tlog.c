@@ -44,6 +44,8 @@ struct tlog {
     int waiters;
 
     int fd;
+    int fd_lock;
+
     off_t filesize;
     char logdir[PATH_MAX];
     char logname[PATH_MAX];
@@ -52,12 +54,13 @@ struct tlog {
     int block;
     int dropped;
     int zip_pid;
+    int multi_log;
+    int logscreen;
 };
 
 typedef int (*list_callback)(const char *name, struct dirent *entry, void *user);
 
 struct tlog tlog;
-static int tlog_logscreen;
 static tlog_level tlog_set_level = TLOG_INFO;
 tlog_format_func tlog_format;
 static const char *tlog_level_str[] = {
@@ -164,10 +167,18 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     int total_len = 0;
     struct tlog_time *tm = &info->time;
 
-    /* format prefix */
-    len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%17s:%-4d] ",
-        tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
-        info->level, info->file, info->line);
+    if (tlog.multi_log) {
+        /* format prefix */
+        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4d][%4s][%17s:%-4d] ",
+            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec, getpid(),
+            info->level, info->file, info->line);
+    } else {
+        /* format prefix */
+        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%17s:%-4d] ",
+            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
+            info->level, info->file, info->line);
+    }
+
     if (len < 0 || len == maxlen) {
         return -1;
     }
@@ -227,6 +238,10 @@ int _tlog_vext(tlog_level level, const char *file, int line, const char *func, v
 {
     int len;
     int maxlen = 0;
+
+    if (tlog.buff == NULL) {
+        return -1;
+    }
 
     pthread_mutex_lock(&tlog.lock);
     do {
@@ -440,6 +455,49 @@ static int _tlog_remove_oldlog(void)
     return 0;
 }
 
+static void _tlog_log_unlock(void)
+{
+    char lock_file[PATH_MAX];
+    if (tlog.fd_lock <= 0) {
+        return;
+    }
+
+    snprintf(lock_file, sizeof(lock_file), "%s/%s.lock", tlog.logdir, tlog.logname);
+    unlink(lock_file);
+    close(tlog.fd_lock);
+    tlog.fd_lock = -1;
+}
+
+static int _tlog_log_lock(void)
+{
+    char lock_file[PATH_MAX];
+    int fd;
+
+    if (tlog.multi_log == 0) {
+        return 0;
+    }
+
+    snprintf(lock_file, sizeof(lock_file), "%s/%s.lock", tlog.logdir, tlog.logname);
+    fd = open(lock_file, O_RDWR | O_CREAT | O_CLOEXEC, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+        fprintf(stderr, "create pid file failed, %s", strerror(errno));
+        return -1;
+    }
+
+    if (lockf(fd, F_TLOCK, 0) < 0) {
+        goto errout;
+    }
+
+    tlog.fd_lock = fd;
+    return 0;
+
+errout:
+    if (fd > 0) {
+        close(fd);
+    }
+    return -1;
+}
+
 static void _tlog_wait_pid(int wait_hang)
 {
     int status;
@@ -465,9 +523,10 @@ static void _tlog_wait_pid(int wait_hang)
 
     /* remove oldes file */
     _tlog_remove_oldlog();
+    _tlog_log_unlock();
 }
 
-static void _tlog_archive_log(void)
+static int _tlog_archive_log(void)
 {
     char gzip_file[PATH_MAX];
     char gzip_cmd[PATH_MAX];
@@ -477,11 +536,15 @@ static void _tlog_archive_log(void)
     snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
     snprintf(pending_file, sizeof(pending_file), "%s/%s.pending", tlog.logdir, tlog.logname);
 
+    if (_tlog_log_lock() != 0) {
+        return -1;
+    }
+
     /* if pending.zip exists */
     if (access(gzip_file, F_OK) == 0) {
         /* rename it to standard name */
         if (_tlog_rename_logfile(gzip_file) != 0) {
-            return;
+            goto errout;
         }
     }
 
@@ -489,7 +552,7 @@ static void _tlog_archive_log(void)
         /* rename current log file to pending */
         snprintf(log_file, sizeof(log_file), "%s/%s", tlog.logdir, tlog.logname);
         if (rename(log_file, pending_file) != 0) {
-            return;
+            goto errout;
         }
     }
 
@@ -499,10 +562,18 @@ static void _tlog_archive_log(void)
         int pid = vfork();
         if (pid == 0) {
             execl("/bin/sh", "sh", "-c", gzip_cmd, NULL);
-            _exit(0);
+            _exit(1);
+        } else if (pid < 0) {
+            goto errout;
         }
         tlog.zip_pid = pid;
     }
+
+    return 0;
+
+errout:
+    _tlog_log_unlock();
+    return -1;
 }
 
 static int _tlog_write_log(char *buff, int bufflen)
@@ -510,6 +581,10 @@ static int _tlog_write_log(char *buff, int bufflen)
     int len;
 
     /* if log file size exceeds threshold, start to compress */
+    if (tlog.multi_log) {
+        tlog.filesize = lseek(tlog.fd, 0, SEEK_END);
+    }
+
     if (tlog.filesize > tlog.logsize && tlog.zip_pid <= 0) {
         close(tlog.fd);
         tlog.fd = -1;
@@ -537,7 +612,7 @@ static int _tlog_write_log(char *buff, int bufflen)
     }
 
     /* output log to screen */
-    if (tlog_logscreen) {
+    if (tlog.logscreen) {
         write(STDOUT_FILENO, buff, bufflen);
     }
 
@@ -643,7 +718,12 @@ static void *_tlog_work(void *arg)
 
 void tlog_setlogscreen(int enable)
 {
-    tlog_logscreen = (enable == 1) ? 1 : 0;
+    tlog.logscreen = (enable != 0) ? 1 : 0;
+}
+
+void tlog_setmultiwriter(int enable)
+{
+    tlog.multi_log = (enable != 0) ? 1 : 0;
 }
 
 int tlog_setlevel(tlog_level level)
@@ -672,7 +752,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     }
 
     tlog_format = _tlog_format;
-    tlog_logscreen = 0;
+    tlog.logscreen = 0;
     tlog.buffsize = (buffsize > 0) ? buffsize : TLOG_BUFF_SIZE;
     tlog.start = 0;
     tlog.end = 0;
@@ -685,6 +765,8 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.fd = -1;
     tlog.filesize = 0;
     tlog.zip_pid = -1;
+    tlog.logscreen = 0;
+    tlog.multi_log = 0;
 
     pthread_attr_init(&attr);
     pthread_mutex_init(&tlog.lock, 0);
@@ -743,11 +825,15 @@ void tlog_exit(void)
 
     if (tlog.buff) {
         free(tlog.buff);
+        tlog.buff = NULL;
     }
 
     if (tlog.fd > 0) {
         close(tlog.fd);
+        tlog.fd = -1;
     }
+
+    _tlog_log_unlock();
 
     pthread_cond_destroy(&tlog.client_cond);
     pthread_mutex_destroy(&tlog.lock);

@@ -8,7 +8,7 @@ void *test(void *arg)
     int id = (int)arg;
     int i = 0;
 
-    for (i = 0; i < 10000; i++) {
+    for (i = 0; i < 100000; i++) {
         tlog(TLOG_ERR, "%d i = %d\n", id, i);
     }
     return NULL;
@@ -16,7 +16,8 @@ void *test(void *arg)
 
 int main(int argc, char *argv[])
 {
-    tlog_init("./log", "test.log", 1024 * 1024 * 5, 10, 0, 0);
+    tlog_init("./log", "test.log", 1024 * 1024 * 32, 10, 1, 0);
+    tlog_setmultiwriter(1);
     pthread_attr_t attr;
     pthread_t threads[10];
     int i;
