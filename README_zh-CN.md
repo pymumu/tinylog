@@ -61,7 +61,7 @@ API说明
 `maxlogcount`: 归档日志个数。  
 `block`: 缓冲区不足时，是否阻塞。  
 `buffsize`: 缓冲区大小。  
-`multiwrite`: 启用多进程写单个日志模式. (注意: 当使用次模式时，所有进程的maxlogsize参数必须一样)  
+`multiwrite`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
 
 2. tlog(level, format, ...)  
 `功能`：打印日志  
