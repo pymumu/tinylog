@@ -36,7 +36,7 @@ Example
 
 int main(int argc, char *argv[]) 
 {
-    tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0);
+    tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
     tlog(TLOG_INFO, "This is a log message.\n");
     tlog_exit();
     return 0;
@@ -44,13 +44,12 @@ int main(int argc, char *argv[])
 ```
 
 If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)  
-For makefile  
+For makefile:   
 ```
-%.o : %.c
-	$(CC) $(CFLAGS) -DBASE_FILE_NAME=\"$(notdir $<)\" -c $< -o $@
+CFLAGS += -DBASE_FILE_NAME=\"$(notdir $<)\"
 ```
 
-For cmake   
+For cmake:   
 ```
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
@@ -59,34 +58,32 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 API description
 ----------------
 1. int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);    
-Function：Initialize log module  
-logdir: Log Output path.    
-logname: Log name.  
-maxlogsize: The maximum size of a single log file.    
-maxlogcount: Number of archived logs.    
-block: Blocked if buffer is not sufficient.    
-buffsize: Buffer size  
+`Function`：Initialize log module  
+`logdir`: Log Output path.    
+`logname`: Log name.  
+`maxlogsize`: The maximum size of a single log file.    
+`maxlogcount`: Number of archived logs.    
+`block`: Blocked if buffer is not sufficient.    
+`buffsize`: Buffer size  
+`multiwrite`: enable multi process write mode. (NOTICE: maxlogsize in all prcesses must be same when enable this mode. )  
 
 2. tlog(level, format, ...)  
-Function：Print log   
-level: Current log Levels  
-format: Log formats    
+`Function`：Print log   
+`level`: Current log Levels  
+`format`: Log formats    
 
 3. tlog_exit（）  
-Function：Log component exits    
+`Function`：Log component exits    
 
 4. tlog_reg_format_func(tlog_format_func func)  
-Function：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
+`Function`：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
 
 5. tlog_setlevel(tlog_level level)  
-Function：Set log level，valid level are :TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.  
+`Function`：Set log level，valid level are :TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.  
 
 6. tlog_setlogscreen(int enable)  
-Function：set whether the log is output to screen.  
+`Function`：set whether the log is output to screen.  
 
-7. tlog_setmultiwriter(int enable)  
-Function：set whether enable multiprocessing write mode.   
-  
 License
 ===============
 MIT License
