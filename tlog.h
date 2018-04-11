@@ -54,11 +54,6 @@ extern int tlog_setlevel(tlog_level level);
 /* enalbe log to screen */
 extern void tlog_setlogscreen(int enable);
 
-/* enable multi writer 
- * NOTICE: maxlogsize in all prcesses must be same.
- */
-extern void tlog_setmultiwriter(int enable);
-
 /*
 Function：Initialize log module  
 logdir: Log Output path.    
@@ -66,9 +61,11 @@ logname: Log name.
 maxlogsize: The maximum size of a single log file.    
 maxlogcount: Number of archived logs.    
 block: Blocked if buffer is not sufficient.    
-buffsize: Buffer size  
+buffsize: Buffer size, zero for default (128K) 
+multiwrite: enable multi process write mode. 
+            NOTICE: maxlogsize in all prcesses must be same when enable this mode.  
  */
-extern int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize);
+extern int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite);
 
 extern void tlog_exit(void);
 

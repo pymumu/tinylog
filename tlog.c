@@ -318,6 +318,7 @@ static int _tlog_rename_logfile(const char *gzip_file)
 {
     char archive_file[PATH_MAX];
     struct tlog_time logtime;
+    int i = 0;
 
     if (_tlog_getmtime(&logtime, gzip_file) != 0) {
         return -1;
@@ -326,6 +327,13 @@ static int _tlog_rename_logfile(const char *gzip_file)
     snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d.gz",
         tlog.logdir, tlog.logname, logtime.year, logtime.mon, logtime.mday,
         logtime.hour, logtime.min, logtime.sec);
+
+    while (access(archive_file, F_OK) == 0) {
+        i++;
+        snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d-%d.gz",
+            tlog.logdir, tlog.logname, logtime.year, logtime.mon, logtime.mday,
+            logtime.hour, logtime.min, logtime.sec, i);
+    }
 
     if (rename(gzip_file, archive_file) != 0) {
         return -1;
@@ -518,6 +526,7 @@ static void _tlog_wait_pid(int wait_hang)
     /* rename ziped file */
     snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
     if (_tlog_rename_logfile(gzip_file) != 0) {
+        _tlog_log_unlock();
         return;
     }
 
@@ -586,6 +595,11 @@ static int _tlog_write_log(char *buff, int bufflen)
     }
 
     if (tlog.filesize > tlog.logsize && tlog.zip_pid <= 0) {
+        if (tlog.filesize < lseek(tlog.fd, 0, SEEK_END) && tlog.multi_log == 0) {
+            const char *msg = "[Auto enable multi-process write mode, log may be lost, please enable multi-process write mode manually]\n";
+            tlog.multi_log = 1;
+            write(tlog.fd, msg, strlen(msg));
+        }
         close(tlog.fd);
         tlog.fd = -1;
         tlog.filesize = 0;
@@ -721,11 +735,6 @@ void tlog_setlogscreen(int enable)
     tlog.logscreen = (enable != 0) ? 1 : 0;
 }
 
-void tlog_setmultiwriter(int enable)
-{
-    tlog.multi_log = (enable != 0) ? 1 : 0;
-}
-
 int tlog_setlevel(tlog_level level)
 {
     if (level >= TLOG_END) {
@@ -736,7 +745,7 @@ int tlog_setlevel(tlog_level level)
     return 0;
 }
 
-int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize)
+int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite)
 {
     pthread_attr_t attr;
     int ret;
@@ -766,7 +775,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.filesize = 0;
     tlog.zip_pid = -1;
     tlog.logscreen = 0;
-    tlog.multi_log = 0;
+    tlog.multi_log = (multiwrite != 0) ? 1 : 0;
 
     pthread_attr_init(&attr);
     pthread_mutex_init(&tlog.lock, 0);
