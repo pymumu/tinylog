@@ -42,6 +42,7 @@ struct tlog {
     pthread_cond_t cond;
     pthread_cond_t client_cond;
     int waiters;
+    int is_wait;
 
     int fd;
     int fd_lock;
@@ -63,12 +64,32 @@ typedef int (*list_callback)(const char *name, struct dirent *entry, void *user)
 struct tlog tlog;
 static tlog_level tlog_set_level = TLOG_INFO;
 tlog_format_func tlog_format;
+static unsigned int tlog_localtime_lock = 0;
+
 static const char *tlog_level_str[] = {
     "DBG",
     "INFO",
     "WARN",
     "ERR"
 };
+
+static inline void _tlog_spin_lock(unsigned int *lock)
+{
+    while (1) {
+        int i;
+        for (i = 0; i < 10000; i++) {
+            if (__sync_bool_compare_and_swap(lock, 0, 1)) {
+                return;
+            }
+        }
+        sched_yield();
+    }
+}
+
+static inline void _tlog_spin_unlock(unsigned int *lock)
+{
+    __sync_bool_compare_and_swap(lock, 1, 0);
+}
 
 static int _tlog_mkdir(const char *path)
 {
@@ -113,6 +134,31 @@ static int _tlog_mkdir(const char *path)
     return 0;
 }
 
+static struct tm *_tlog_localtime(time_t *timep, struct tm *tm)
+{
+    static time_t last_time = {0};
+    static struct tm last_tm = {0};
+
+    /* localtime_r has a global timezone lock, it's about 8 times slower than gmtime
+     * this code is used to speed up localtime_r call.
+     */
+    _tlog_spin_lock(&tlog_localtime_lock);
+    if (*timep == last_time) {
+        *tm = last_tm;
+    } else {
+        _tlog_spin_unlock(&tlog_localtime_lock);
+        tm = localtime_r(timep, tm);
+        if (tm) {
+            last_time = *timep;
+            last_tm = *tm;
+        }
+        _tlog_spin_lock(&tlog_localtime_lock);
+    }
+    _tlog_spin_unlock(&tlog_localtime_lock);
+
+    return tm;
+}
+
 static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
 {
     struct tm tm;
@@ -122,7 +168,7 @@ static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
         return -1;
     }
 
-    if (localtime_r(&sb.st_mtime, &tm) == NULL) {
+    if (_tlog_localtime(&sb.st_mtime, &tm) == NULL) {
         return -1;
     }
 
@@ -132,7 +178,7 @@ static int _tlog_getmtime(struct tlog_time *log_mtime, const char *file)
     log_mtime->hour = tm.tm_hour;
     log_mtime->min = tm.tm_min;
     log_mtime->sec = tm.tm_sec;
-    log_mtime->millisec = 0;
+    log_mtime->usec = 0;
 
     return 0;
 }
@@ -146,7 +192,7 @@ static int _tlog_gettime(struct tlog_time *cur_time)
         return -1;
     }
 
-    if (localtime_r(&tmval.tv_sec, &tm) == NULL) {
+    if (_tlog_localtime(&tmval.tv_sec, &tm) == NULL) {
         return -1;
     }
 
@@ -156,7 +202,7 @@ static int _tlog_gettime(struct tlog_time *cur_time)
     cur_time->hour = tm.tm_hour;
     cur_time->min = tm.tm_min;
     cur_time->sec = tm.tm_sec;
-    cur_time->millisec = tmval.tv_usec / 1000;
+    cur_time->usec = tmval.tv_usec;
 
     return 0;
 }
@@ -170,12 +216,12 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
     if (tlog.multi_log) {
         /* format prefix */
         len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4d][%4s][%17s:%-4d] ",
-            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec, getpid(),
+            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->usec / 1000, getpid(),
             info->level, info->file, info->line);
     } else {
         /* format prefix */
         len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%17s:%-4d] ",
-            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->millisec,
+            tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->usec / 1000,
             info->level, info->file, info->line);
     }
 
@@ -292,7 +338,9 @@ int _tlog_vext(tlog_level level, const char *file, int line, const char *func, v
         tlog.ext_end = tlog.end;
         tlog.end = 0;
     }
-    pthread_cond_signal(&tlog.cond);
+    if (tlog.is_wait) {
+        pthread_cond_signal(&tlog.cond);
+    }
     pthread_mutex_unlock(&tlog.lock);
     return len;
 }
@@ -672,7 +720,9 @@ static void *_tlog_work(void *arg)
             /* if buffer is empty, wait */
             clock_gettime(CLOCK_REALTIME, &tm);
             tm.tv_sec += 5;
+            tlog.is_wait = 1;
             ret = pthread_cond_timedwait(&tlog.cond, &tlog.lock, &tm);
+            tlog.is_wait = 0;
             if (ret < 0 || ret == ETIMEDOUT) {
                 pthread_mutex_unlock(&tlog.lock);
                 if (ret == ETIMEDOUT) {
@@ -706,7 +756,7 @@ static void *_tlog_work(void *arg)
 
         if (log_dropped > 0) {
             /* if there is dropped log, record dropped log number */
-            char dropmsg[TLOG_BUFF_SIZE];
+            char dropmsg[TLOG_TMP_LEN];
             snprintf(dropmsg, sizeof(dropmsg), "[Totoal Dropped %d Messages]\n", log_dropped);
             _tlog_write_log(dropmsg, strnlen(dropmsg, sizeof(dropmsg)));
         }
@@ -766,7 +816,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.start = 0;
     tlog.end = 0;
     tlog.ext_end = 0;
-    tlog.block = block;
+    tlog.block = (block != 0) ? 1 : 0;
     tlog.waiters = 0;
     tlog.dropped = 0;
     tlog.logsize = (maxlogsize > 0) ? maxlogsize : TLOG_LOG_SIZE;
@@ -776,6 +826,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.zip_pid = -1;
     tlog.logscreen = 0;
     tlog.multi_log = (multiwrite != 0) ? 1 : 0;
+    tlog.is_wait = 0;
 
     pthread_attr_init(&attr);
     pthread_mutex_init(&tlog.lock, 0);
