@@ -25,7 +25,7 @@ struct tlog_time {
     int hour;
     int min;
     int sec;
-    int millisec;
+    int usec;
 };
 
 struct tlog_info {
