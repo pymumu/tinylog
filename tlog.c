@@ -148,11 +148,11 @@ static struct tm *_tlog_localtime(time_t *timep, struct tm *tm)
     } else {
         _tlog_spin_unlock(&tlog_localtime_lock);
         tm = localtime_r(timep, tm);
+        _tlog_spin_lock(&tlog_localtime_lock);
         if (tm) {
             last_time = *timep;
             last_tm = *tm;
         }
-        _tlog_spin_lock(&tlog_localtime_lock);
     }
     _tlog_spin_unlock(&tlog_localtime_lock);
 
