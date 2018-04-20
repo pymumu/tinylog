@@ -79,9 +79,6 @@ API说明
 
 6. tlog_setlogscreen(int enable)  
 `功能`：设置日志是否输出到屏幕　  
-
-7. tlog_setmultiwriter(int enable)  
-`功能`：设置是否启用多进程并发写。  
   
 License
 ===============
