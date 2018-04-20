@@ -85,7 +85,7 @@ API说明
 `功能`：注册自定义格式函数，回调函数定义为：tlog_format_func 
 
 5. tlog_setlevel(tlog_level level)  
-`功能`：设置日志级别，有效参数为TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.  
+`功能`：设置日志级别，有效参数为TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL  
 
 6. tlog_setlogscreen(int enable)  
 `功能`：设置日志是否输出到屏幕　  

@@ -89,7 +89,7 @@ API description
 `Function`：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
 
 5. tlog_setlevel(tlog_level level)  
-`Function`：Set log level，valid level are :TLOG_DBG, TLOG_INFO, TLOG_WARN, TLOG_ERR.  
+`Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL.
 
 6. tlog_setlogscreen(int enable)  
 `Function`：set whether the log is output to screen.  
