@@ -11,11 +11,13 @@ extern "C" {
 #endif /*__cplusplus */
 
 typedef enum {
-    TLOG_DBG = 0,
+    TLOG_DEBUG = 0,
     TLOG_INFO = 1,
-    TLOG_WARN = 2,
-    TLOG_ERR = 3,
-    TLOG_END = 4
+    TLOG_NOTICE = 2,
+    TLOG_WARN = 3,
+    TLOG_ERROR = 4,
+    TLOG_FATAL = 5,
+    TLOG_END = 6
 } tlog_level;
 
 struct tlog_time {
@@ -47,6 +49,7 @@ format: Log formats
 #define tlog(level, format, ...) tlog_ext(level, BASE_FILE_NAME, __LINE__, __func__, 0, format, ##__VA_ARGS__)
 
 extern int tlog_ext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, ...) __attribute__((format(printf, 6, 7)));
+extern int tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap);
 
 /* set log level */
 extern int tlog_setlevel(tlog_level level);
