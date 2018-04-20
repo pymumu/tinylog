@@ -3,13 +3,22 @@ TinyLog
 
 [中文REAMDME请看这里](README_zh-CN.md)
 
-Tinylog is a lightweight C-language log component for UNIX environment that provides a common log output interface and logs output to a file in certain format.
+Tinylog is a lightweight C-language high performance log component for UNIX environment, It is high performance, asynchronized, thread-safe and process-safe log library for C/C++.
 
-Support for log archiving, multithreading writing, multiprocessing writing, non-blocking mode.  
+It support log archiving, asynchronized, multithreading writing, multiprocessing writing, non-blocking mode.  
 
 output example:
 ```
 [2018-04-03 21:52:13,485][INFO][        example.c:7   ] This is a log message.
+```
+
+archive example:  
+```
+root@raspberrypi:/home/pi/code/tiny-log/test # ls log/ -l
+total 11564
+-rw-r----- 1 root root 8754060 Apr 20 21:48 test.log
+-rw-r----- 1 root root 1543852 Apr 20 21:48 test.log-20180420-214824.gz
+-rw-r----- 1 root root 1539119 Apr 20 21:48 test.log-20180420-214830.gz
 ```
 
 Features
@@ -17,9 +26,10 @@ Features
 1. Log to compressed archive file.
 2. Log level output.
 3. log format customization.
-4. non-blocking log mode.
-5. Multithreading concurrent write.
-6. Multiprcessing concurrent write.
+4. asynchronized log output.
+5. non-blocking log mode.
+6. Multithreading concurrent write.
+7. Multiprcessing concurrent write.
 
 Usage
 ==============
