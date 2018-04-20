@@ -67,10 +67,12 @@ tlog_format_func tlog_format;
 static unsigned int tlog_localtime_lock = 0;
 
 static const char *tlog_level_str[] = {
-    "DBG",
+    "DEBUG",
     "INFO",
+    "NOTICE",
     "WARN",
-    "ERR"
+    "ERROR",
+    "FATAL",
 };
 
 static inline void _tlog_spin_lock(unsigned int *lock)
@@ -215,12 +217,12 @@ static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *us
 
     if (tlog.multi_log) {
         /* format prefix */
-        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4d][%4s][%17s:%-4d] ",
+        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%5d][%4s][%17s:%-4d] ",
             tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->usec / 1000, getpid(),
             info->level, info->file, info->line);
     } else {
         /* format prefix */
-        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%4s][%17s:%-4d] ",
+        len = snprintf(buff, maxlen, "[%.4d-%.2d-%.2d %.2d:%.2d:%.2d,%.3d][%5s][%17s:%-4d] ",
             tm->year, tm->mon, tm->mday, tm->hour, tm->min, tm->sec, tm->usec / 1000,
             info->level, info->file, info->line);
     }
@@ -280,13 +282,17 @@ static int _tlog_log_buffer(char *buff, int maxlen, tlog_level level, const char
     return len;
 }
 
-int _tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap)
+int tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap)
 {
     int len;
     int maxlen = 0;
 
     if (tlog.buff == NULL) {
         return -1;
+    }
+
+    if (level < tlog_set_level) {
+        return 0;
     }
 
     pthread_mutex_lock(&tlog.lock);
@@ -351,12 +357,8 @@ int tlog_ext(tlog_level level, const char *file, int line, const char *func, voi
     int len;
     va_list ap;
 
-    if (level < tlog_set_level) {
-        return 0;
-    }
-
     va_start(ap, format);
-    len = _tlog_vext(level, file, line, func, userptr, format, ap);
+    len = tlog_vext(level, file, line, func, userptr, format, ap);
     va_end(ap);
 
     return len;
@@ -783,6 +785,12 @@ static void *_tlog_work(void *arg)
 void tlog_setlogscreen(int enable)
 {
     tlog.logscreen = (enable != 0) ? 1 : 0;
+}
+
+int tlog_reg_format_func(tlog_format_func callback)
+{
+    tlog_format = callback;
+    return 0;
 }
 
 int tlog_setlevel(tlog_level level)
