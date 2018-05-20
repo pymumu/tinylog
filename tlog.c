@@ -396,7 +396,6 @@ static int _tlog_list_dir(const char *path, list_callback callback, void *userpt
 {
     DIR *dir = NULL;
     struct dirent *ent;
-    struct dirent entsave;
     int ret = 0;
 
     dir = opendir(path);
@@ -405,9 +404,9 @@ static int _tlog_list_dir(const char *path, list_callback callback, void *userpt
         goto errout;
     }
 
-    while (readdir_r(dir, &entsave, &ent) == 0 && ent != NULL) {
-        if (strncmp(".", ent->d_name, 2) == 0 || strncmp("..", ent->d_name, 3) == 0) {
-            continue;
+    while ((ent = readdir(dir)) != NULL) {
+		if (strncmp(".", ent->d_name, 2) == 0 || strncmp("..", ent->d_name, 3) == 0) {
+			continue;
         }
         ret = callback(path, ent, userptr);
         if (ret != 0) {
