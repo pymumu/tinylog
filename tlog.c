@@ -1,7 +1,9 @@
 /*
- * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com>
+ * ttinylog 
+ * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com> 
+ * https://github.com/pymumu/tinylog
  */
-
+#define _GNU_SOURCE 
 #include "tlog.h"
 #include <dirent.h>
 #include <errno.h>
@@ -287,12 +289,14 @@ int tlog_vext(tlog_level level, const char *file, int line, const char *func, vo
     int len;
     int maxlen = 0;
 
-    if (tlog.buff == NULL) {
-        return -1;
-    }
-
     if (level < tlog_set_level) {
         return 0;
+    }
+    
+    if (tlog.buff == NULL) {
+        vprintf(format, ap);
+        printf("\n");
+        return -1;
     }
 
     pthread_mutex_lock(&tlog.lock);
@@ -405,8 +409,8 @@ static int _tlog_list_dir(const char *path, list_callback callback, void *userpt
     }
 
     while ((ent = readdir(dir)) != NULL) {
-		if (strncmp(".", ent->d_name, 2) == 0 || strncmp("..", ent->d_name, 3) == 0) {
-			continue;
+        if (strncmp(".", ent->d_name, 2) == 0 || strncmp("..", ent->d_name, 3) == 0) {
+            continue;
         }
         ret = callback(path, ent, userptr);
         if (ret != 0) {
@@ -584,6 +588,50 @@ static void _tlog_wait_pid(int wait_hang)
     _tlog_log_unlock();
 }
 
+static void _tlog_close_all_fd(void)
+{
+    char path_name[PATH_MAX];
+    DIR *dir = NULL;
+    struct dirent *ent;
+    int dir_fd = -1;
+
+    snprintf(path_name, sizeof(path_name), "/proc/self/fd/");
+    dir = opendir(path_name);
+    if (dir == NULL) {
+        fprintf(stderr, "open directory failed, %s\n", strerror(errno));
+        goto errout;
+    }
+
+    dir_fd = dirfd(dir);
+
+    while ((ent = readdir(dir)) != NULL) {
+        int fd = atoi(ent->d_name);
+        if (fd < 0 || dir_fd == fd) {
+            continue;
+        }
+        switch (fd) {
+        case STDIN_FILENO:
+        case STDOUT_FILENO:
+        case STDERR_FILENO:
+            continue; 
+            break; 
+        default:
+            break;
+        }
+
+        close(fd);
+    }
+
+    closedir(dir);
+
+    return;
+errout:
+    if (dir) {
+        closedir(dir);
+    }
+    return;
+}
+
 static int _tlog_archive_log(void)
 {
     char gzip_file[PATH_MAX];
@@ -619,6 +667,7 @@ static int _tlog_archive_log(void)
     if (tlog.zip_pid <= 0) {
         int pid = vfork();
         if (pid == 0) {
+            _tlog_close_all_fd();
             execl("/bin/sh", "sh", "-c", gzip_cmd, NULL);
             _exit(1);
         } else if (pid < 0) {
