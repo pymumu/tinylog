@@ -1,5 +1,5 @@
 /*
- * ttinylog 
+ * tinylog 
  * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com> 
  * https://github.com/pymumu/tinylog
  */
