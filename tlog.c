@@ -20,11 +20,20 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef likely
+# define likely(x)		__builtin_expect(!!(x), 1)
+#endif
+
+#ifndef unlikely
+# define unlikely(x)		__builtin_expect(!!(x), 0)
+#endif
+
 #define TLOG_BUFF_SIZE (1024 * 128)
 #define TLOG_MAX_LINE_LEN (1024)
 #define TLOG_TMP_LEN 128
 #define TLOG_LOG_SIZE (1024 * 1024 * 50)
 #define TLOG_LOG_COUNT 32
+#define TLOG_LOG_NAME_LEN 128
 
 struct oldest_log {
     char name[TLOG_TMP_LEN];
@@ -51,7 +60,7 @@ struct tlog {
 
     off_t filesize;
     char logdir[PATH_MAX];
-    char logname[PATH_MAX];
+    char logname[TLOG_LOG_NAME_LEN];
     int logsize;
     int logcount;
     int block;
@@ -292,8 +301,12 @@ int tlog_vext(tlog_level level, const char *file, int line, const char *func, vo
     if (level < tlog_set_level) {
         return 0;
     }
-    
-    if (tlog.buff == NULL) {
+
+    if (unlikely(tlog.logsize <= 0)) {
+		return 0;
+	}
+
+	if (unlikely(tlog.buff == NULL)) {
         vprintf(format, ap);
         printf("\n");
         return -1;
@@ -370,7 +383,7 @@ int tlog_ext(tlog_level level, const char *file, int line, const char *func, voi
 
 static int _tlog_rename_logfile(const char *gzip_file)
 {
-    char archive_file[PATH_MAX];
+    char archive_file[PATH_MAX * 2];
     struct tlog_time logtime;
     int i = 0;
 
@@ -448,7 +461,7 @@ static int _tlog_count_log_callback(const char *path, struct dirent *entry, void
 static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, void *userptr)
 {
     struct stat sb;
-    char filename[PATH_MAX];
+    char filename[PATH_MAX * 2];
     struct oldest_log *oldestlog = userptr;
 
     /* if not a gz file, skip */
@@ -488,7 +501,7 @@ static int _tlog_remove_oldestlog(void)
         return -1;
     }
 
-    char filename[PATH_MAX];
+    char filename[PATH_MAX * 2];
     snprintf(filename, sizeof(filename), "%s/%s", tlog.logdir, oldestlog.name);
 
     /* delete */
@@ -518,7 +531,7 @@ static int _tlog_remove_oldlog(void)
 
 static void _tlog_log_unlock(void)
 {
-    char lock_file[PATH_MAX];
+    char lock_file[PATH_MAX * 2];
     if (tlog.fd_lock <= 0) {
         return;
     }
@@ -531,7 +544,7 @@ static void _tlog_log_unlock(void)
 
 static int _tlog_log_lock(void)
 {
-    char lock_file[PATH_MAX];
+    char lock_file[PATH_MAX * 2];
     int fd;
 
     if (tlog.multi_log == 0) {
@@ -574,7 +587,7 @@ static void _tlog_wait_pid(int wait_hang)
 
     /* gzip process exited */
     tlog.zip_pid = -1;
-    char gzip_file[PATH_MAX];
+    char gzip_file[PATH_MAX * 2];
 
     /* rename ziped file */
     snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
@@ -634,10 +647,10 @@ errout:
 
 static int _tlog_archive_log(void)
 {
-    char gzip_file[PATH_MAX];
-    char gzip_cmd[PATH_MAX];
-    char log_file[PATH_MAX];
-    char pending_file[PATH_MAX];
+    char gzip_file[PATH_MAX * 2];
+    char gzip_cmd[PATH_MAX * 2];
+    char log_file[PATH_MAX * 2];
+    char pending_file[PATH_MAX * 2];
 
     snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
     snprintf(pending_file, sizeof(pending_file), "%s/%s.pending", tlog.logdir, tlog.logname);
@@ -706,7 +719,7 @@ static int _tlog_write_log(char *buff, int bufflen)
 
     if (tlog.fd <= 0) {
         /* open a new log file to write */
-        char logfile[PATH_MAX];
+        char logfile[PATH_MAX * 2];
         if (_tlog_mkdir(tlog.logdir) != 0) {
             fprintf(stderr, "create log dir %s failed.\n", tlog.logdir);
             return -1;
@@ -875,7 +888,7 @@ int tlog_init(const char *logdir, const char *logname, int maxlogsize, int maxlo
     tlog.block = (block != 0) ? 1 : 0;
     tlog.waiters = 0;
     tlog.dropped = 0;
-    tlog.logsize = (maxlogsize > 0) ? maxlogsize : TLOG_LOG_SIZE;
+    tlog.logsize = (maxlogsize >= 0) ? maxlogsize : TLOG_LOG_SIZE;
     tlog.logcount = (maxlogcount > 0) ? maxlogcount : TLOG_LOG_COUNT;
     tlog.fd = -1;
     tlog.filesize = 0;
