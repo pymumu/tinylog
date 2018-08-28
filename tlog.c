@@ -1,9 +1,11 @@
 /*
  * tinylog 
- * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com> 
+ * Copyright (C) 2018 Nick Peng <pymumu@gmail.com> 
  * https://github.com/pymumu/tinylog
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE 
+#endif
 #include "tlog.h"
 #include <dirent.h>
 #include <errno.h>
@@ -34,6 +36,7 @@
 #define TLOG_LOG_SIZE (1024 * 1024 * 50)
 #define TLOG_LOG_COUNT 32
 #define TLOG_LOG_NAME_LEN 128
+#define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 2)
 
 struct oldest_log {
     char name[TLOG_TMP_LEN];
@@ -383,7 +386,7 @@ int tlog_ext(tlog_level level, const char *file, int line, const char *func, voi
 
 static int _tlog_rename_logfile(const char *gzip_file)
 {
-    char archive_file[PATH_MAX * 2];
+    char archive_file[TLOG_BUFF_LEN];
     struct tlog_time logtime;
     int i = 0;
 
@@ -461,7 +464,7 @@ static int _tlog_count_log_callback(const char *path, struct dirent *entry, void
 static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, void *userptr)
 {
     struct stat sb;
-    char filename[PATH_MAX * 2];
+    char filename[TLOG_BUFF_LEN];
     struct oldest_log *oldestlog = userptr;
 
     /* if not a gz file, skip */
@@ -647,10 +650,10 @@ errout:
 
 static int _tlog_archive_log(void)
 {
-    char gzip_file[PATH_MAX * 2];
+    char gzip_file[TLOG_BUFF_LEN];
     char gzip_cmd[PATH_MAX * 2];
-    char log_file[PATH_MAX * 2];
-    char pending_file[PATH_MAX * 2];
+    char log_file[TLOG_BUFF_LEN];
+    char pending_file[TLOG_BUFF_LEN];
 
     snprintf(gzip_file, sizeof(gzip_file), "%s/%s.pending.gz", tlog.logdir, tlog.logname);
     snprintf(pending_file, sizeof(pending_file), "%s/%s.pending", tlog.logdir, tlog.logname);
