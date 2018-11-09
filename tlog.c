@@ -717,6 +717,8 @@ static void _tlog_close_all_fd_by_res(void)
 {
     struct rlimit lim;
     int maxfd = 0;
+    int i = 0;
+
     getrlimit(RLIMIT_NOFILE, &lim);
 
     maxfd = lim.rlim_cur;
@@ -724,7 +726,7 @@ static void _tlog_close_all_fd_by_res(void)
         maxfd = 4096;
     }
 
-    for (int i = 3; i < maxfd; i++) {
+    for (i = 3; i < maxfd; i++) {
         close(i);
     }
 }
