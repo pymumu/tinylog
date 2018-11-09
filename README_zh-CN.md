@@ -44,36 +44,36 @@ total 11564
 
 1. 输出日志
 
-```c
-#include <stdio.h>
-#include "tlog.h"
+    ```c
+    #include <stdio.h>
+    #include "tlog.h"
 
-int main(int argc, char *argv[])
-{
-    tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
-    tlog(TLOG_INFO, "This is a log message.\n");
-    tlog_exit();
-    return 0;
-}
-```
+    int main(int argc, char *argv[])
+    {
+        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog(TLOG_INFO, "This is a log message.\n");
+        tlog_exit();
+        return 0;
+    }
+    ```
 
 1. 独立日志流
 
-```c
-#include <stdio.h>
-#include "tlog.h"
+    ```c
+    #include <stdio.h>
+    #include "tlog.h"
 
-int main(int argc, char *argv[]) 
-{
-    tlog_log *log = NULL;
-    tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
-    log = tlog_open("./", "another.log", 1024 * 1024, 8, 1, 0, 0);
-    tlog_printf(log, "This is a separate log stream.\n");
-    tlog_close(log);
-    tlog_exit();
-    return 0;
-}
-```
+    int main(int argc, char *argv[])
+    {
+        tlog_log *log = NULL;
+        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
+        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_printf(log, "This is a separate log stream.\n");
+        tlog_close(log);
+        tlog_exit();
+        return 0;
+    }
+    ```
 
 如果要让日志中文件名不包含路径，在编译的时候，可指定编译宏BASE_FILE_NAME，在Makefile中可指定如下语句，实现编译时生成短文件名：(例子请参考example的makfile。)  
 makefile  
