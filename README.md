@@ -43,36 +43,38 @@ total 11564
 
 ## Example
 
-```C
-#include <stdio.h>
-#include "tlog.h"
+1. Output log
 
-int main(int argc, char *argv[]) 
-{
-    tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
-    tlog(TLOG_INFO, "This is a log message.\n");
-    tlog_exit();
-    return 0;
-}
-```
+    ```C
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog(TLOG_INFO, "This is a log message.\n");
+        tlog_exit();
+        return 0;
+    }
+    ```
 
 1. Independent log stream
 
-```C
-#include <stdio.h>
-#include "tlog.h"
+    ```C
+    #include <stdio.h>
+    #include "tlog.h"
 
-int main(int argc, char *argv[])
-{
-    tlog_log *log = NULL;
-    tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
-    log = tlog_open("./", "another.log", 1024 * 1024, 8, 1, 0, 0);
-    tlog_printf(log, "This is a separate log stream\n");
-    tlog_close(log);
-    tlog_exit();
-    return 0;
-}
-```
+    int main(int argc, char *argv[])
+    {
+        tlog_log *log = NULL;
+        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
+        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_printf(log, "This is a separate log stream\n");
+        tlog_close(log);
+        tlog_exit();
+        return 0;
+    }
+    ```
 
 If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)  
 For makefile:
