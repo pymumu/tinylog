@@ -51,7 +51,7 @@ total 11564
 
     int main(int argc, char *argv[])
     {
-        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
         tlog_exit();
         return 0;
@@ -67,8 +67,8 @@ total 11564
     int main(int argc, char *argv[])
     {
         tlog_log *log = NULL;
-        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0);
-        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0, 0);
         tlog_printf(log, "This is a separate log stream\n");
         tlog_close(log);
         tlog_exit();
@@ -92,8 +92,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
 ## API description
 
-1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize);
-
+1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int nocompress);
     `Function`：Initialize log module  
     `logfile`: log file  
     `maxlogsize`: The maximum size of a single log file.  
@@ -101,6 +100,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `block`: Blocked if buffer is not sufficient.  
     `buffsize`: Buffer size  
     `multiwrite`: enable multi process write mode. (NOTICE: maxlogsize in all prcesses must be same when enable this mode. )  
+    `nocompress`: not compress archive log file.  
 
 1. tlog(level, format, ...)  
 
@@ -124,7 +124,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `Function`：set whether the log is output to screen.  
 
-1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite)  
+1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)  
 
     `Function`: Initializes a new log stream. When finished, it is closed with tlog_cloese.  
     `logfile`: log file  
@@ -132,7 +132,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `maxlogcount`: The number of archived logs.  
     `block`: Whether the block is blocked when the buffer is insufficient.  
     `buffsize`: The size of the buffer.  
-    `multiwrite`: Enable multi-process write single log mode. (Note: When using this mode, the maxlogsize parameter of all processes must be the same)  
+    `multiwrite`: Enable multi-process write single log mode. (Note: When using this mode, the maxlogsize parameter of all processes must be the same) 
+    `nocompress`: not compress archive log file.  
     `return value`: log stream handle.  
 
 1. tlog_close(tlog_log *log)  
@@ -159,7 +160,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `log`: The log stream handle.  
     `enable`: Whether to enable.  
 
-1. tlog_localtime(struct tlog_time *tm
+1. tlog_localtime(struct tlog_time *tm)
 
     `Function`: Get local time.  
     `tm`: Local time output.  

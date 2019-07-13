@@ -39,6 +39,7 @@
 #define TLOG_LOG_COUNT 32
 #define TLOG_LOG_NAME_LEN 128
 #define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 2)
+#define TLOG_SUFFIX_GZ ".gz"
 
 struct tlog_log {
     char *buff;
@@ -53,12 +54,14 @@ struct tlog_log {
     off_t filesize;
     char logdir[PATH_MAX];
     char logname[TLOG_LOG_NAME_LEN];
-    int logsize;
-    int logcount;
+	char suffix[TLOG_LOG_NAME_LEN];
+	int logsize;
+	int logcount;
     int block;
     int dropped;
-    int zip_pid;
-    int multi_log;
+	int nocompress;
+	int zip_pid;
+	int multi_log;
     int logscreen;
     
     time_t last_try;
@@ -335,7 +338,7 @@ static int _tlog_print_buffer(char *buff, int maxlen, void *userptr, const char 
     return total_len;
 }
 
-int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, void *userptr, const char *format, va_list ap)
+static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, void *userptr, const char *format, va_list ap)
 {
     int len;
     int maxlen = 0;
@@ -429,7 +432,7 @@ int tlog_printf(struct tlog_log *log, const char *format, ...)
     return len;
 }
 
-int _tlog_early_print(const char *format, va_list ap) 
+static int _tlog_early_print(const char *format, va_list ap) 
 {
     char log_buf[TLOG_MAX_LINE_LEN];
     int len = 0;
@@ -496,28 +499,28 @@ int tlog_ext(tlog_level level, const char *file, int line, const char *func, voi
     return len;
 }
 
-static int _tlog_rename_logfile(struct tlog_log *log, const char *gzip_file)
+static int _tlog_rename_logfile(struct tlog_log *log, const char *log_file)
 {
     char archive_file[TLOG_BUFF_LEN];
     struct tlog_time logtime;
     int i = 0;
 
-    if (_tlog_getmtime(&logtime, gzip_file) != 0) {
+    if (_tlog_getmtime(&logtime, log_file) != 0) {
         return -1;
     }
 
-    snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d.gz", 
+    snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d%s", 
         log->logdir, log->logname, logtime.year, logtime.mon, logtime.mday,
-        logtime.hour, logtime.min, logtime.sec);
+        logtime.hour, logtime.min, logtime.sec, log->suffix);
 
     while (access(archive_file, F_OK) == 0) {
         i++;
-        snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d-%d.gz", 
+        snprintf(archive_file, sizeof(archive_file), "%s/%s-%.4d%.2d%.2d-%.2d%.2d%.2d-%d%s", 
             log->logdir, log->logname, logtime.year, logtime.mon,
-            logtime.mday, logtime.hour, logtime.min, logtime.sec, i);
+            logtime.mday, logtime.hour, logtime.min, logtime.sec, i, log->suffix);
     }
 
-    if (rename(gzip_file, archive_file) != 0) {
+    if (rename(log_file, archive_file) != 0) {
         return -1;
     }
 
@@ -560,13 +563,15 @@ static int _tlog_count_log_callback(const char *path, struct dirent *entry, void
 {
     struct count_log *count_log = (struct count_log *)userptr;
     struct tlog_log *log = count_log->log;
+	char logname[TLOG_LOG_NAME_LEN];
 
-    if (strstr(entry->d_name, ".gz") == NULL) {
+	if (strstr(entry->d_name, log->suffix) == NULL) {
         return 0;
     }
 
-    int len = strnlen(log->logname, sizeof(log->logname));
-    if (strncmp(log->logname, entry->d_name, len) != 0) {
+	snprintf(logname, sizeof(logname), "%s-", log->logname);
+	int len = strnlen(logname, sizeof(logname));
+	if (strncmp(logname, entry->d_name, len) != 0) {
         return 0;
     }
 
@@ -580,15 +585,17 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
     char filename[TLOG_BUFF_LEN];
     struct oldest_log *oldestlog = userptr;
     struct tlog_log *log = oldestlog->log;
+    char logname[TLOG_LOG_NAME_LEN];
 
-    /* if not a gz file, skip */
-    if (strstr(entry->d_name, ".gz") == NULL) {
+    /* if not a log file, skip */
+    if (strstr(entry->d_name, log->suffix) == NULL) {
         return 0;
     }
 
-    /* if not tlog gz file, skip */
-    int len = strnlen(log->logname, sizeof(log->logname));
-    if (strncmp(log->logname, entry->d_name, len) != 0) {
+    /* if not tlog log file, skip */
+	snprintf(logname, sizeof(logname), "%s-", log->logname);
+	int len = strnlen(logname, sizeof(logname));
+	if (strncmp(logname, entry->d_name, len) != 0) {
         return 0;
     }
 
@@ -625,7 +632,7 @@ static int _tlog_remove_oldestlog(struct tlog_log *log)
     /* delete */
     unlink(filename);
 
-    return 0;
+	return 0;
 }
 
 static int _tlog_remove_oldlog(struct tlog_log *log)
@@ -784,7 +791,7 @@ errout:
     return;
 }
 
-static int _tlog_archive_log(struct tlog_log *log)
+static int _tlog_archive_log_compressed(struct tlog_log *log)
 {
     char gzip_file[TLOG_BUFF_LEN];
     char gzip_cmd[PATH_MAX * 2];
@@ -833,6 +840,50 @@ static int _tlog_archive_log(struct tlog_log *log)
 errout:
     _tlog_log_unlock(log);
     return -1;
+}
+
+static int _tlog_archive_log_nocompress(struct tlog_log *log)
+{
+    char log_file[TLOG_BUFF_LEN];
+    char pending_file[TLOG_BUFF_LEN];
+
+    snprintf(pending_file, sizeof(pending_file), "%s/%s.pending", log->logdir, log->logname);
+
+    if (_tlog_log_lock(log) != 0) {
+        return -1;
+    }
+
+    if (access(pending_file, F_OK) != 0) {
+        /* rename current log file to pending */
+        snprintf(log_file, sizeof(log_file), "%s/%s", log->logdir, log->logname);
+        if (rename(log_file, pending_file) != 0) {
+            goto errout;
+        }
+    }
+
+    /* rename pending file */
+    if (_tlog_rename_logfile(log, pending_file) != 0) {
+		goto errout;
+	}
+
+	/* remove oldes file */
+    _tlog_remove_oldlog(log);
+    _tlog_log_unlock(log);
+
+    return 0;
+
+errout:
+    _tlog_log_unlock(log);
+    return -1;
+}
+
+static int _tlog_archive_log(struct tlog_log *log)
+{
+    if (log->nocompress) {
+		return _tlog_archive_log_nocompress(log);
+	} else {
+		return _tlog_archive_log_compressed(log);
+	}
 }
 
 static int _tlog_write_log(struct tlog_log *log, char *buff, int bufflen)
@@ -943,7 +994,7 @@ static int _tlog_any_has_data(void)
     return ret;
 }
 
-int _tlog_wait_pids(void)
+static int _tlog_wait_pids(void)
 {
     static time_t last = -1;
     time_t now = 0;
@@ -1194,7 +1245,7 @@ int tlog_setlevel(tlog_level level)
     return 0;
 }
 
-tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite)
+tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)
 {
     struct tlog_log *log = NULL;
     char log_file[PATH_MAX];
@@ -1222,19 +1273,23 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bl
     log->fd = -1;
     log->filesize = 0;
     log->zip_pid = -1;
-    log->logscreen = 0;
-    log->is_exit = 0;
+	log->nocompress = (nocompress == 0) ? 0 : 1;
+	log->logscreen = 0;
+	log->is_exit = 0;
     log->multi_log = (multiwrite != 0) ? 1 : 0;
     log->waiters = 0;
 
-    strncpy(log_file, logfile, PATH_MAX);
+	strncpy(log_file, logfile, PATH_MAX);
     strncpy(log->logdir, dirname(log_file), sizeof(log->logdir));
     strncpy(log_file, logfile, PATH_MAX);
     strncpy(log->logname, basename(log_file), sizeof(log->logname));
-    pthread_mutex_init(&log->lock, 0);
-    pthread_cond_init(&log->client_cond, 0);
+    if (log->nocompress) {
+		log->suffix[0] = '\0';
+	} else {
+		strncpy(log->suffix, TLOG_SUFFIX_GZ, sizeof(log->suffix));
+    }
 
-    log->buff = malloc(log->buffsize);
+	log->buff = malloc(log->buffsize);
     if (log->buff == NULL) {
         fprintf(stderr, "malloc log buffer failed, %s\n", strerror(errno));
         goto errout;
@@ -1271,7 +1326,7 @@ void tlog_close(tlog_log *log)
     log->is_exit = 1;
 }
 
-int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite)
+int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)
 {
     pthread_attr_t attr;
     int ret;
@@ -1297,7 +1352,7 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, i
     pthread_mutex_init(&tlog.lock, 0);
     tlog.run = 1;
 
-    log = tlog_open(logfile, maxlogsize, maxlogcount, block, buffsize, multiwrite);
+    log = tlog_open(logfile, maxlogsize, maxlogcount, block, buffsize, multiwrite, nocompress);
     if (log == NULL) {
         fprintf(stderr, "init tlog root failed.\n");
         goto errout;
