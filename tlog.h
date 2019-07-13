@@ -72,8 +72,9 @@ block: Blocked if buffer is not sufficient.
 buffsize: Buffer size, zero for default (128K)
 multiwrite: enable multi process write mode.
             NOTICE: maxlogsize in all prcesses must be same when enable this mode.
+nocompress: whether disable log compression.
  */
-extern int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite);
+extern int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress);
 
 /* flush pending log message, and exit tlog */
 extern void tlog_exit(void);
@@ -100,10 +101,11 @@ block: Blocked if buffer is not sufficient.
 buffsize: Buffer size, zero for default (128K)
 multiwrite: enable multi process write mode.
             NOTICE: maxlogsize in all prcesses must be same when enable this mode.
+nocompress: whether disable log compression.
 
 return: log stream handler.
  */
-extern tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite);
+extern tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress);
 
 extern void tlog_close(tlog_log *log);
 

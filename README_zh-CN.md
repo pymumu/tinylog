@@ -50,7 +50,7 @@ total 11564
 
     int main(int argc, char *argv[])
     {
-        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
         tlog_exit();
         return 0;
@@ -66,8 +66,8 @@ total 11564
     int main(int argc, char *argv[])
     {
         tlog_log *log = NULL;
-        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0);
-        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0);
+        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0, 0);
         tlog_printf(log, "This is a separate log stream.\n");
         tlog_close(log);
         tlog_exit();
@@ -91,7 +91,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
 ## API说明
 
-1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize);  
+1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int nocompress);  
 
     `功能`: 初始化日志模块  
     `logfile`: 日志文件。  
@@ -100,6 +100,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `block`: 缓冲区不足时，是否阻塞。  
     `buffsize`: 缓冲区大小。  
     `multiwrite`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
+    `nocompress`: 归档日志不进行压缩。  
 
 1. tlog(level, format, ...)  
 
@@ -124,7 +125,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `功能`: 设置日志是否输出到屏幕。  
     `enable`: 是否启用。  
   
-1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite)  
+1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)  
 
     `功能`: 　初始化一个新的日志流，完成后，使用tlog_cloese关闭。  
     `logfile`: 日志文件。  
@@ -133,6 +134,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `block`: 缓冲区不足时，是否阻塞。  
     `buffsize`: 缓冲区大小。  
     `multiwrite`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
+    `nocompress`: 归档日志不进行压缩。  
     `返回值`: 日志流句柄。
 
 1. tlog_close(tlog_log *log)  
