@@ -38,7 +38,7 @@
 #define TLOG_LOG_SIZE (1024 * 1024 * 50)
 #define TLOG_LOG_COUNT 32
 #define TLOG_LOG_NAME_LEN 128
-#define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 2)
+#define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 3)
 #define TLOG_SUFFIX_GZ ".gz"
 
 struct tlog_log {
@@ -85,7 +85,7 @@ struct tlog {
 };
 
 struct oldest_log {
-    char name[TLOG_TMP_LEN];
+    char name[TLOG_LOG_NAME_LEN];
     time_t mtime;
     struct tlog_log *log;
 };
@@ -147,8 +147,9 @@ static int _tlog_mkdir(const char *path)
     }
 
     strncpy(path_c, path, sizeof(path_c) - 1);
-    len = strnlen(path_c, sizeof(path_c) - 1);
-    path_c[len] = '/';
+	path_c[sizeof(path_c) - 1] = '\0';
+	len = strnlen(path_c, sizeof(path_c) - 1);
+	path_c[len] = '/';
     path_c[len + 1] = '\0';
     path_end = path_c;
 
@@ -563,7 +564,7 @@ static int _tlog_count_log_callback(const char *path, struct dirent *entry, void
 {
     struct count_log *count_log = (struct count_log *)userptr;
     struct tlog_log *log = count_log->log;
-	char logname[TLOG_LOG_NAME_LEN];
+	char logname[TLOG_LOG_NAME_LEN * 2];
 
 	if (strstr(entry->d_name, log->suffix) == NULL) {
         return 0;
@@ -585,7 +586,7 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
     char filename[TLOG_BUFF_LEN];
     struct oldest_log *oldestlog = userptr;
     struct tlog_log *log = oldestlog->log;
-    char logname[TLOG_LOG_NAME_LEN];
+    char logname[TLOG_LOG_NAME_LEN * 2];
 
     /* if not a log file, skip */
     if (strstr(entry->d_name, log->suffix) == NULL) {
@@ -607,9 +608,10 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
 
     if (oldestlog->mtime == 0 || oldestlog->mtime > sb.st_mtime) {
         oldestlog->mtime = sb.st_mtime;
-        strncpy(oldestlog->name, entry->d_name, sizeof(oldestlog->name));
-        return 0;
-    }
+        strncpy(oldestlog->name, entry->d_name, sizeof(oldestlog->name) - 1);
+		oldestlog->name[sizeof(oldestlog->name) - 1] = '\0';
+		return 0;
+	}
 
     return 0;
 }
@@ -1279,10 +1281,14 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bl
     log->multi_log = (multiwrite != 0) ? 1 : 0;
     log->waiters = 0;
 
+	strncpy(log_file, logfile, sizeof(log_file) - 1);
+	log_file[sizeof(log_file) - 1] = '\0';
+	strncpy(log->logdir, dirname(log_file), sizeof(log->logdir));
+    log->logdir[sizeof(log->logdir) - 1] = '\0';
 	strncpy(log_file, logfile, PATH_MAX);
-    strncpy(log->logdir, dirname(log_file), sizeof(log->logdir));
-    strncpy(log_file, logfile, PATH_MAX);
+    log_file[sizeof(log_file) - 1] = '\0';
     strncpy(log->logname, basename(log_file), sizeof(log->logname));
+    log->logname[sizeof(log->logname) - 1] = '\0';
     if (log->nocompress) {
 		log->suffix[0] = '\0';
 	} else {
