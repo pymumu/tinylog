@@ -1,6 +1,6 @@
 /*
  * tinylog
- * Copyright (C) 2018 Nick Peng <pymumu@gmail.com>
+ * Copyright (C) 2018-2019 Nick Peng <pymumu@gmail.com>
  * https://github.com/pymumu/tinylog
  */
 #ifndef _GNU_SOURCE
@@ -957,7 +957,7 @@ static int _tlog_archive_log(struct tlog_log *log)
     }
 }
 
-static int _tlog_write_log(struct tlog_log *log, char *buff, int bufflen)
+static int _tlog_write(struct tlog_log *log, char *buff, int bufflen)
 {
     int len;
 
@@ -1028,6 +1028,11 @@ static int _tlog_write_log(struct tlog_log *log, char *buff, int bufflen)
         log->filesize += len;
     } 
     return len;
+}
+
+int tlog_write(struct tlog_log *log, char *buff, int bufflen)
+{
+    return _tlog_write(log, buff, bufflen);
 }
 
 static int _tlog_has_data(struct tlog_log *log)
@@ -1200,7 +1205,7 @@ static void _tlog_write_one_segment_log(struct tlog_log *log, char *buff, int bu
             return;
         }
 
-        log->output_func(log, segment_head->data, segment_head->len);
+        log->output_func(log, segment_head->data, segment_head->len - 1);
         write_len += segment_head->len + sizeof(*segment_head);
         segment_head = (struct tlog_segment_head *)(buff + write_len);
     }
@@ -1246,12 +1251,12 @@ static int _tlog_root_write_log(struct tlog_log *log, char *buff, int bufflen)
     struct tlog_segment_log_head *head = NULL;
     static struct tlog_segment_log_head empty_info;
     if (tlog.output_func == NULL) {
-        return _tlog_write_log(log, buff, bufflen);
+        return _tlog_write(log, buff, bufflen);
     }
 
     if (log->segment_log && tlog.root == log) {
         head = (struct tlog_segment_log_head *)buff;
-        return tlog.output_func(&head->info, head->data, head->len, tlog_get_private(log));
+        return tlog.output_func(&head->info, head->data, head->len - 1, tlog_get_private(log));
     }
 
     return tlog.output_func(&empty_info.info, buff, bufflen, tlog_get_private(log));
@@ -1375,6 +1380,15 @@ void tlog_setlogscreen(int enable)
     _tlog_log_setlogscreen(tlog.root, enable);
 }
 
+int tlog_write_log(char *buff, int bufflen)
+{
+    if (unlikely(tlog.root == NULL)) {
+        return -1;
+    }
+
+    return _tlog_write(tlog.root, buff, bufflen);
+}
+
 void tlog_logscreen(tlog_log *log, int enable)
 {
     if (log == NULL) {
@@ -1391,7 +1405,7 @@ int tlog_reg_output_func(tlog_log *log, tlog_output_func output)
     }
 
     if (output == NULL) {
-        log->output_func = _tlog_write_log;
+        log->output_func = _tlog_write;
         return 0;
     }
 
@@ -1457,7 +1471,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->logscreen = ((flag & TLOG_SCREEN) == 0) ? 0 : 1;
     log->multi_log = ((flag & TLOG_MULTI_WRITE) == 0) ? 0 : 1;
     log->segment_log = ((flag & TLOG_SEGMENT) == 0) ? 0 : 1;
-    log->output_func = _tlog_write_log;
+    log->output_func = _tlog_write;
 
     strncpy(log_file, logfile, sizeof(log_file) - 1);
     log_file[sizeof(log_file) - 1] = '\0';

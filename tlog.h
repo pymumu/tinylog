@@ -1,6 +1,6 @@
 /*
  * tinylog
- * Copyright (C) 2018 Ruilin Peng (Nick) <pymumu@gmail.com>
+ * Copyright (C) 2018-2019 Ruilin Peng (Nick) <pymumu@gmail.com>
  * https://github.com/pymumu/tinylog
  */
 
@@ -73,6 +73,9 @@ extern int tlog_ext(tlog_level level, const char *file, int line, const char *fu
     __attribute__((format(printf, 6, 7)));
 extern int tlog_vext(tlog_level level, const char *file, int line, const char *func, void *userptr, const char *format, va_list ap);
 
+/* write buff to log file */
+extern int tlog_write_log(char *buff, int bufflen);
+
 /* set log level */
 extern int tlog_setlevel(tlog_level level);
 
@@ -128,6 +131,10 @@ return: log stream handler.
  */
 extern tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);
 
+/* write buff to log file */
+extern int tlog_write(struct tlog_log *log, char *buff, int bufflen);
+
+/* close log stream */
 extern void tlog_close(tlog_log *log);
 
 /*
