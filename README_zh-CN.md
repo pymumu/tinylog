@@ -50,7 +50,7 @@ total 11564
 
     int main(int argc, char *argv[])
     {
-        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
         tlog_exit();
         return 0;
@@ -66,8 +66,8 @@ total 11564
     int main(int argc, char *argv[])
     {
         tlog_log *log = NULL;
-        tlog_init("./", "example.log", 1024 * 1024, 8, 1, 0, 0, 0);
-        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
         tlog_printf(log, "This is a separate log stream.\n");
         tlog_close(log);
         tlog_exit();
@@ -91,16 +91,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
 ## API说明
 
-1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int nocompress);  
+1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);  
 
     `功能`: 初始化日志模块  
     `logfile`: 日志文件。  
     `maxlogsize`: 单个日志文件最大大小。  
     `maxlogcount`: 归档日志个数。  
-    `block`: 缓冲区不足时，是否阻塞。  
     `buffsize`: 缓冲区大小。  
-    `multiwrite`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
-    `nocompress`: 归档日志不进行压缩。  
+    `flag`:日志输出模式：可设置：  
+    * `TLOG_MULTI_WRITE`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
+    * `TLOG_NOCOMPRESS`: 归档日志不进行压缩。  
+    * `TLOG_SEGMENT`: 日志分段，用于注册回调函数后，返回一条完整的日志用于后续处理。  
+    * `TLOG_BLOCK`: 缓冲区不足时，不阻塞。  
+    * `TLOG_SCREEN`: 输出日志到屏幕。  
 
 1. tlog(level, format, ...)  
 
@@ -114,7 +117,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
 1. tlog_reg_format_func(tlog_format_func func)  
 
-    `功能`: 注册自定义格式函数，回调函数定义为: tlog_format_func 
+    `功能`: 注册自定义格式函数，回调函数定义为: tlog_format_func  
+
+1. int tlog_reg_log_output_func(tlog_log_output_func output, void *private)
+    `功能`: 注册自定义日志输出函数，回调函数定义为：tlog_log_output_func， 可在日志初始化时设置TLOG_SEGMENT标志使回调返回一条独立完整日志。
 
 1. tlog_setlevel(tlog_level level)  
 
@@ -125,16 +131,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `功能`: 设置日志是否输出到屏幕。  
     `enable`: 是否启用。  
   
-1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)  
+1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);  
 
     `功能`: 　初始化一个新的日志流，完成后，使用tlog_cloese关闭。  
     `logfile`: 日志文件。  
     `maxlogsize`: 单个日志文件最大大小。  
     `maxlogcount`: 归档日志个数。  
-    `block`: 缓冲区不足时，是否阻塞。  
     `buffsize`: 缓冲区大小。  
-    `multiwrite`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
-    `nocompress`: 归档日志不进行压缩。  
+    `flag`:日志输出模式：可设置：  
+    * `TLOG_MULTI_WRITE`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
+    * `TLOG_NOCOMPRESS`: 归档日志不进行压缩。  
+    * `TLOG_SEGMENT`: 日志分段，用于注册回调函数后，返回一条完整的日志用于后续处理。  
+    * `TLOG_NOBLOCK`: 缓冲区不足时，不阻塞。  
+    * `TLOG_SCREEN`: 输出日志到屏幕。  
     `返回值`: 日志流句柄。
 
 1. tlog_close(tlog_log *log)  
@@ -165,6 +174,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `功能`: 获取本地时间。  
     `tm`: 本地时间输出。  
+
+1. int tlog_reg_output_func(tlog_log *log, tlog_output_func output)  
+
+    `功能`: 注册日志流输出回调函数，指定后，内置的写本地文件接口将失效; 可在日志流初始化时设置TLOG_SEGMENT标志使回调返回一条独立完整日志。  
+
+1. void tlog_set_private(tlog_log *log, void *private)  
+
+    `功能`: 设置私有参数，供回调函数中获取。  
+    `log`: 日志流句柄。  
+    `private`: 私有参数。  
+
+1. void tlog_get_private(tlog_log *log)
+
+    `功能`: 获取私有参数，供回调函数中获取。  
+    `log`: 日志流句柄。  
+    `返回值`: 私有参数。  
 
 ## License
 

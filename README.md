@@ -51,14 +51,14 @@ total 11564
 
     int main(int argc, char *argv[])
     {
-        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
         tlog_exit();
         return 0;
     }
     ```
 
-1. Independent log stream
+1. Independent log stream  
 
     ```C
     #include <stdio.h>
@@ -67,8 +67,8 @@ total 11564
     int main(int argc, char *argv[])
     {
         tlog_log *log = NULL;
-        tlog_init("./example.log", 1024 * 1024, 8, 1, 0, 0, 0);
-        log = tlog_open("./another.log", 1024 * 1024, 8, 1, 0, 0, 0);
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
         tlog_printf(log, "This is a separate log stream\n");
         tlog_close(log);
         tlog_exit();
@@ -92,15 +92,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
 ## API description
 
-1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int nocompress);
+1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);  
     `Function`：Initialize log module  
     `logfile`: log file  
     `maxlogsize`: The maximum size of a single log file.  
     `maxlogcount`: Number of archived logs.  
-    `block`: Blocked if buffer is not sufficient.  
     `buffsize`: Buffer size  
-    `multiwrite`: enable multi process write mode. (NOTICE: maxlogsize in all prcesses must be same when enable this mode. )  
-    `nocompress`: not compress archive log file.  
+    `flag`: log output flag: List of flags are as follows  
+    * `TLOG_MULTI_WRITE`: Enable multi-process write single log mode. (Note: When using this mode, the maxlogsize parameter of all processes must be the same)  
+    * `TLOG_NOCOMPRESS`: The archive log is not compressed.  
+    * `TLOG_SEGMENT`: Log segmentation, used to register the callback function, returns a complete log for subsequent processing.  
+    * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
+    * `TLOG_SCREEN`: Output logs to the screen.  
 
 1. tlog(level, format, ...)  
 
@@ -116,6 +119,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `Function`：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
 
+1. tlog_reg_log_output_func(tlog_log_output_func output, void *private)  
+    `Function`: Register the custom log output function. The callback function is defined as: tlog_log_output_func. The TLOG_SEGMENT flag can be set during log initialization to return the callback to an independent full log.
+
 1. tlog_setlevel(tlog_level level)  
 
     `Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL.
@@ -124,16 +130,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `Function`：set whether the log is output to screen.  
 
-1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int block, int buffsize, int multiwrite, int nocompress)  
+1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)  
 
     `Function`: Initializes a new log stream. When finished, it is closed with tlog_cloese.  
     `logfile`: log file  
     `maxlogsize`: The maximum size of a single log file.  
     `maxlogcount`: The number of archived logs.  
-    `block`: Whether the block is blocked when the buffer is insufficient.  
     `buffsize`: The size of the buffer.  
-    `multiwrite`: Enable multi-process write single log mode. (Note: When using this mode, the maxlogsize parameter of all processes must be the same) 
-    `nocompress`: not compress archive log file.  
+    `flag`: log output flag: List of flags are as follows  
+    * `TLOG_MULTI_WRITE`: Enable multi-process write single log mode. (Note: When using this mode, the maxlogsize parameter of all processes must be the same)  
+    * `TLOG_NOCOMPRESS`: The archive log is not compressed.  
+    * `TLOG_SEGMENT`: Log segmentation, used to register the callback function, returns a complete log for subsequent processing.  
+    * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
+    * `TLOG_SCREEN`: Output logs to the screen.  
     `return value`: log stream handle.  
 
 1. tlog_close(tlog_log *log)  
@@ -160,10 +169,26 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `log`: The log stream handle.  
     `enable`: Whether to enable.  
 
-1. tlog_localtime(struct tlog_time *tm)
+1. tlog_localtime(struct tlog_time *tm)  
 
     `Function`: Get local time.  
     `tm`: Local time output.  
+
+1. tlog_reg_output_func(tlog_log *log, tlog_output_func output)  
+
+    `Function`: Register the log stream output callback function. After the specified, the built-in write local file interface will be invalid. The TLOG_SEGMENT flag can be set when the log stream is initialized to return the callback to an independent complete log.
+
+1. tlog_set_private(tlog_log *log, void *private)
+
+    `Function`: Set private parameters for retrieval in the callback function.  
+    `log`: The log stream handle.  
+    `private`: private parameter.  
+
+1. tlog_get_private(tlog_log *log)  
+
+    `Function`: Get the private parameter, which is obtained from the callback function.  
+    `log`: The log stream handle.  
+    `return value`: private parameter.  
 
 ## License
 

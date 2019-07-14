@@ -31,8 +31,8 @@ void *test1(void *arg)
 
 int main(int argc, char *argv[])
 {
-    tlog_init("log/test.log", 1024 * 1024 * 32, 10, 1, 0, 1, 0);
-    logs = tlog_open("log/test1.log", 1024 * 1024 * 32, 10, 1, 0, 1, 1);
+    tlog_init("log/test.log", 1024 * 1024 * 32, 10, 0, 0);
+    logs = tlog_open("log/test1.log", 1024 * 1024 * 32, 10, 0, TLOG_NOCOMPRESS);
     pthread_attr_t attr;
     pthread_t threads[10];
     pthread_t threads1[10];
