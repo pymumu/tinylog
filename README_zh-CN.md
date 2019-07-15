@@ -102,7 +102,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     * `TLOG_MULTI_WRITE`: 启用多进程写单个日志模式. (注意: 当使用此模式时，所有进程的maxlogsize参数必须一样)  
     * `TLOG_NOCOMPRESS`: 归档日志不进行压缩。  
     * `TLOG_SEGMENT`: 日志分段，用于注册回调函数后，返回一条完整的日志用于后续处理。  
-    * `TLOG_BLOCK`: 缓冲区不足时，不阻塞。  
+    * `TLOG_NONBLOCK`: 缓冲区不足时，不阻塞。  
     * `TLOG_SCREEN`: 输出日志到屏幕。  
 
 1. tlog(level, format, ...)  

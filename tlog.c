@@ -40,6 +40,7 @@
 #define TLOG_LOG_NAME_LEN 128
 #define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 3)
 #define TLOG_SUFFIX_GZ ".gz"
+#define TLOG_SUFFIX_LOG ""
 
 #define TLOG_SEGMENT_MAGIC 0xFF446154
 
@@ -68,7 +69,7 @@ struct tlog_log {
     int segment_log;
  
     tlog_output_func output_func;
-    void *private;
+    void *private_data;
 
     time_t last_try;
     int waiters;
@@ -277,13 +278,13 @@ int tlog_localtime(struct tlog_time *tm)
     return _tlog_gettime(tm);
 }
 
-void tlog_set_private(tlog_log *log, void *private)
+void tlog_set_private(tlog_log *log, void *private_data)
 {
     if (log == NULL) {
         return;
     }
 
-    log->private = private;
+    log->private_data = private_data;
 }
 
 void *tlog_get_private(tlog_log *log)
@@ -292,7 +293,7 @@ void *tlog_get_private(tlog_log *log)
         return NULL;
     }
 
-    return log->private;
+    return log->private_data;
 }
 
 static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *userptr, const char *format, va_list ap)
@@ -336,7 +337,7 @@ static int _tlog_root_log_buffer(char *buff, int maxlen, void *userptr, const ch
 {
     int len = 0;
     int log_len = 0;
-    struct tlog_info_inter *info_inter = userptr;
+    struct tlog_info_inter *info_inter = (struct tlog_info_inter *)userptr;
     struct tlog_segment_log_head *log_head = NULL;
 
     if (tlog_format == NULL) {
@@ -389,10 +390,42 @@ static int _tlog_print_buffer(char *buff, int maxlen, void *userptr, const char 
     return total_len;
 }
 
+static int _tlog_need_drop(struct tlog_log *log)
+{
+    int maxlen = 0;
+    int ret = -1;
+    if (log->block) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&tlog.lock);
+    if (log->end == log->start) {
+        if (log->ext_end == 0) {
+            /* if buffer is empty */
+            maxlen = log->buffsize - log->end;
+        }
+    } else if (log->end > log->start) {
+        maxlen = log->buffsize - log->end;
+    } else {
+        /* if reverse */
+        maxlen = log->start - log->end;
+    }
+
+    /* if free buffer length is less than min line length */
+    if (maxlen < TLOG_MAX_LINE_LEN) {
+        log->dropped++;
+        ret = 0;
+    }
+    pthread_mutex_unlock(&tlog.lock);
+    return ret;
+}
+
 static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, void *userptr, const char *format, va_list ap)
 {
     int len;
     int maxlen = 0;
+    char buff[TLOG_MAX_LINE_LEN];
+
     struct tlog_segment_head *segment_head = NULL;
 
     if (log == NULL || format == NULL) {
@@ -400,6 +433,15 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
     }
 
     if (log->buff == NULL) {
+        return -1;
+    }
+
+    if (_tlog_need_drop(log) == 0) {
+        return -1;
+    }
+
+    len = print_callback(buff, sizeof(buff), userptr, format, ap);
+    if (len <= 0 || len >= TLOG_MAX_LINE_LEN) {
         return -1;
     }
 
@@ -448,23 +490,14 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
 
     if (log->segment_log) {
         segment_head = (struct tlog_segment_head *)(log->buff + log->end);
-        /* write log to buffer */
-        len = print_callback(segment_head->data, maxlen - sizeof(*segment_head), userptr, format, ap);
-        if (len <= 0) {
-            pthread_mutex_unlock(&tlog.lock);
-            return -1;
-        }
+        memcpy(segment_head->data, buff, len);
         log->end += len + sizeof(*segment_head) + 1;
         segment_head->len = len + 1;
         segment_head->data[len] = '\0';
         segment_head->magic = TLOG_SEGMENT_MAGIC;
     } else {
         /* write log to buffer */
-        len = print_callback(log->buff + log->end, maxlen, userptr, format, ap);
-        if (len <= 0) {
-            pthread_mutex_unlock(&tlog.lock);
-            return -1;
-        }
+        memcpy(log->buff + log->end, buff, len);
         log->end += len;
     }
 
@@ -653,7 +686,7 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
 {
     struct stat sb;
     char filename[TLOG_BUFF_LEN];
-    struct oldest_log *oldestlog = userptr;
+    struct oldest_log *oldestlog = (struct oldest_log *)userptr;
     struct tlog_log *log = oldestlog->log;
     char logname[TLOG_LOG_NAME_LEN * 2];
 
@@ -1420,10 +1453,10 @@ int tlog_reg_format_func(tlog_format_func callback)
     return 0;
 }
 
-int tlog_reg_log_output_func(tlog_log_output_func output, void *private)
+int tlog_reg_log_output_func(tlog_log_output_func output, void *private_data)
 {
     tlog.output_func = output;
-    tlog_set_private(tlog.root, private);
+    tlog_set_private(tlog.root, private_data);
     return 0;
 }
 
@@ -1447,7 +1480,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
         return NULL;
     }
 
-    log = malloc(sizeof(*log));
+    log = (struct tlog_log *)malloc(sizeof(*log));
     if (log == NULL) {
         fprintf(stderr, "malloc log failed.");
         return NULL;
@@ -1482,12 +1515,12 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     strncpy(log->logname, basename(log_file), sizeof(log->logname));
     log->logname[sizeof(log->logname) - 1] = '\0';
     if (log->nocompress) {
-        log->suffix[0] = '\0';
+        strncpy(log->suffix, TLOG_SUFFIX_LOG, sizeof(sizeof(log->suffix)));
     } else {
         strncpy(log->suffix, TLOG_SUFFIX_GZ, sizeof(log->suffix));
     }
 
-    log->buff = malloc(log->buffsize);
+    log->buff = (char *)malloc(log->buffsize);
     if (log->buff == NULL) {
         fprintf(stderr, "malloc log buffer failed, %s\n", strerror(errno));
         goto errout;
