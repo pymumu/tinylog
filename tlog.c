@@ -1059,7 +1059,12 @@ static int _tlog_write(struct tlog_log *log, char *buff, int bufflen)
     len = write(log->fd, buff, bufflen);
     if (len > 0) {
         log->filesize += len;
-    } 
+    } else {
+        if (log->fd > 0 && errno == ENOSPC) {
+            close(log->fd);
+            log->fd = -1;
+        }
+    }
     return len;
 }
 
