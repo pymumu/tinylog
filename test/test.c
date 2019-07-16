@@ -20,7 +20,7 @@ void *test(void *arg)
 
 void *test1(void *arg)
 {
-    int id = (int)arg;
+    int id = (intptr_t)arg;
     int i = 0;
 
     for (i = 0; i < 100000; i++) {

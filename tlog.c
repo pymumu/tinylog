@@ -72,8 +72,10 @@ struct tlog_log {
     void *private_data;
 
     time_t last_try;
-    int waiters;
-    int is_exit;
+	time_t last_waitpid;
+
+	int waiters;
+	int is_exit;
     struct tlog_log *next;
     pthread_mutex_t lock;
     pthread_cond_t client_cond;
@@ -1110,34 +1112,31 @@ static int _tlog_any_has_data(void)
 
 static int _tlog_wait_pids(void)
 {
-    static time_t last = -1;
-    time_t now = 0;
-
+    time_t now = time(0);
     struct tlog_log *next = NULL;
+	static struct tlog_log *last_log = NULL;
 
-    pthread_mutex_lock(&tlog.lock);
-    next = tlog.log;
-    while (next) {
-        if (next->zip_pid > 0) {
-            if (now == 0) {
-                now = time(0);
-            }
+	pthread_mutex_lock(&tlog.lock);
+	for (next = tlog.log; next != NULL; next = next->next) {
+        if (next->zip_pid <= 0) {
+			continue;
+		}
 
-            if (now != last) {
-                pthread_mutex_unlock(&tlog.lock);
-                /* try to archive compressed file */
-                _tlog_wait_pid(next, 0);
-                last = now;
-                return 0;
-            }
-        }
-        next = next->next;
-    }
+        if (next == last_log) {
+			continue;
+		}
+
+        if (next->last_waitpid == now) {
+			continue;
+		}
+
+		last_log = next;
+		next->last_waitpid = now;
+		pthread_mutex_unlock(&tlog.lock);
+		_tlog_wait_pid(next, 0);
+        return 0;
+	}
     pthread_mutex_unlock(&tlog.lock);
-
-    if (now != 0) {
-        last = now;
-    }
 
     return 0;
 }
