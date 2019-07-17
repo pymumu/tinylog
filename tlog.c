@@ -72,10 +72,10 @@ struct tlog_log {
     void *private_data;
 
     time_t last_try;
-	time_t last_waitpid;
+    time_t last_waitpid;
 
-	int waiters;
-	int is_exit;
+    int waiters;
+    int is_exit;
     struct tlog_log *next;
     pthread_mutex_t lock;
     pthread_cond_t client_cond;
@@ -1114,28 +1114,29 @@ static int _tlog_wait_pids(void)
 {
     time_t now = time(0);
     struct tlog_log *next = NULL;
-	static struct tlog_log *last_log = NULL;
+    static struct tlog_log *last_log = NULL;
 
-	pthread_mutex_lock(&tlog.lock);
-	for (next = tlog.log; next != NULL; next = next->next) {
+    pthread_mutex_lock(&tlog.lock);
+    for (next = tlog.log; next != NULL; next = next->next) {
         if (next->zip_pid <= 0) {
-			continue;
-		}
+            continue;
+        }
 
         if (next == last_log) {
-			continue;
-		}
+            continue;
+        }
 
         if (next->last_waitpid == now) {
-			continue;
-		}
+            continue;
+        }
 
-		last_log = next;
-		next->last_waitpid = now;
-		pthread_mutex_unlock(&tlog.lock);
-		_tlog_wait_pid(next, 0);
+        last_log           = next;
+        next->last_waitpid = now;
+        pthread_mutex_unlock(&tlog.lock);
+        _tlog_wait_pid(next, 0);
         return 0;
-	}
+    }
+    last_log = NULL;
     pthread_mutex_unlock(&tlog.lock);
 
     return 0;
