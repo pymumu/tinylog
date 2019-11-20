@@ -7,12 +7,12 @@ int main(int argc, char *argv[])
 
     /* init and output log message */
     tlog_init("example.log", 1024 * 1024, 8, 0, 0);
-	tlog(TLOG_INFO, "This is a log message.\n");
+    tlog(TLOG_INFO, "This is a log message.\n");
 
-	/* open another log file, and output message*/
+    /* open another log file, and output message*/
     log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
-	tlog_printf(log, "This is a separate log stream\n");
-	/* close log stream */
+    tlog_printf(log, "This is a separate log stream\n");
+    /* close log stream */
     tlog_close(log);
 
     /* flush pending message, and exit tlog */
