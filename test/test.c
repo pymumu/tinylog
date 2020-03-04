@@ -13,7 +13,7 @@ void *test(void *arg)
     int i = 0;
 
     for (i = 0; i < 100000; i++) {
-        tlog(TLOG_ERROR, "%d i = %d\n", id, i);
+        tlog_error("%d i = %d\n", id, i);
     }
     return NULL;
 }

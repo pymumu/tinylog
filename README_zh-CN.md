@@ -32,13 +32,15 @@ total 11564
 7. 非阻塞日志。
 8. 多线程并发写。
 9. 多进程并发写。
+10. c++流风格日志输出。
 
 ## 使用
 
 1. 将日志头文件`tlog.h`包含到C代码的中。
 2. 调用`tlog_init`初始化日志模块。
-3. 调用`tlog`日志输出函数输出日志。
-4. 调用`tlog_exit`退出关闭日志组件。
+3. 调用`tlog`或`tlog_[debug|info|notice|warn|error|fatal]`日志输出函数输出日志。
+4. c++使用cout风格输出日志到`tlog_info`。
+5. 调用`tlog_exit`退出关闭日志组件。
 
 ## 例子
 
@@ -52,12 +54,30 @@ total 11564
     {
         tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
+        tlog_info("This is another log message.\n");
+        tlog_exit();
+        return 0;
+    }
+    ```
+
+1. c++流日志
+
+    ```cpp
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        tlog_info << "This is a c++ cout style log message.\n";
         tlog_exit();
         return 0;
     }
     ```
 
 1. 独立日志流
+
+    c printf风格  
 
     ```c
     #include <stdio.h>
@@ -69,6 +89,24 @@ total 11564
         tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
         tlog_printf(log, "This is a separate log stream.\n");
+        tlog_close(log);
+        tlog_exit();
+        return 0;
+    }
+    ```
+
+    c++ std::out 风格
+
+    ```cpp
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_log *log = NULL;
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
+        tlog_out(log) << "This is a separate log stream.\n";
         tlog_close(log);
         tlog_exit();
         return 0;
@@ -111,6 +149,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `level`: 当前日志级别  
     `format`: 日志格式。  
 
+1. tlog_debug, tlog_info, tlog_notice, tlog_warn, tlog_error, tlog_fatal  
+
+    `功能`: 打印日志, c++使用`<<`输出日志。
+    `format`: 日志格式。  
+
 1. tlog_exit（）  
 
     `功能`: 日志组件退出。  
@@ -125,6 +168,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 1. tlog_setlevel(tlog_level level)  
 
     `功能`: 设置日志级别，有效参数为TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL  
+
+1. tlog_setlevel(tlog_level level)  
+
+    `功能`: 获取设置的日志级别。  
 
 1. tlog_setlogscreen(int enable)  
 
@@ -156,6 +203,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `功能`: 打印日志到指定日志流  
     `log`: 日志流句柄。  
     `format`: 日志格式。  
+
+1. tlog_out(tlog_log *log)  
+
+    `功能`: c++风格打印日志到指定日志流，使用`<<`输出日志  
+    `log`: 日志流句柄。  
 
 1. tlog_vprintf(tlog_log *log, const char *format, va_list ap)  
 

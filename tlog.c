@@ -1005,7 +1005,7 @@ static int _tlog_archive_log(struct tlog_log *log)
     }
 }
 
-static int _tlog_write(struct tlog_log *log, char *buff, int bufflen)
+static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 {
     int len;
 
@@ -1083,7 +1083,7 @@ static int _tlog_write(struct tlog_log *log, char *buff, int bufflen)
     return len;
 }
 
-int tlog_write(struct tlog_log *log, char *buff, int bufflen)
+int tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 {
     return _tlog_write(log, buff, bufflen);
 }
@@ -1297,7 +1297,7 @@ static void _tlog_work_write(struct tlog_log *log, int log_len, int log_extlen, 
     }
 }
 
-static int _tlog_root_write_log(struct tlog_log *log, char *buff, int bufflen)
+static int _tlog_root_write_log(struct tlog_log *log, const char *buff, int bufflen)
 {
     struct tlog_segment_log_head *head = NULL;
     static struct tlog_segment_log_head empty_info;
@@ -1489,6 +1489,11 @@ int tlog_setlevel(tlog_level level)
 
     tlog_set_level = level;
     return 0;
+}
+
+tlog_level tlog_getlevel(void)
+{
+    return tlog_set_level;
 }
 
 tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)

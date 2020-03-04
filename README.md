@@ -33,13 +33,15 @@ total 11564
 7. non-blocking log mode.
 8. Multithreading concurrent write.
 9. Multiprcessing concurrent write.
+10. c++ std::cout sytle log function.
 
 ## Usage
 
 1. Include the log header file `tlog.h` in the C code.
 2. Call `tlog_init` to initialize the log module.
-3. Call `tlog` function output log.
-4. Call `tlog_exit` to exit the shutdown log component.
+3. Call `tlog` or `tlog_[debug|info|notice|warn|error|fatal]` function output log.
+4. Call `tlog_[debug|info|notice|warn|error|fatal]<<` output c++ log.
+5. Call `tlog_exit` to exit the shutdown log component.
 
 ## Example
 
@@ -58,7 +60,24 @@ total 11564
     }
     ```
 
+1. Output log for c++ cout style
+
+    ```cpp
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        tlog_info << "This is a c++ cout style log message.\n";
+        tlog_exit();
+        return 0;
+    }
+    ```
+
 1. Independent log stream  
+
+    c printf style  
 
     ```C
     #include <stdio.h>
@@ -70,6 +89,24 @@ total 11564
         tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
         tlog_printf(log, "This is a separate log stream\n");
+        tlog_close(log);
+        tlog_exit();
+        return 0;
+    }
+    ```
+
+    cpp std::out like style  
+
+    ```Cpp
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_log *log = NULL;
+        tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+        log = tlog_open("another.log", 1024 * 1024, 8, 0, TLOG_SEGMENT);
+        tlog_out(log) << "This is a separate log stream\n";
         tlog_close(log);
         tlog_exit();
         return 0;
@@ -111,6 +148,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `level`: Current log Levels  
     `format`: Log formats  
 
+1. tlog_debug, tlog_info, tlog_notice, tlog_warn, tlog_error, tlog_fatal  
+
+    `Function`：Print log, for c++ use `<<` output log.  
+    `format`: Log formats.  
+
 1. tlog_exit（）  
 
     `Function`：Log component exits  
@@ -120,11 +162,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `Function`：Registers a custom Format function, and the callback function is defined as：tlog_format_func  
 
 1. tlog_reg_log_output_func(tlog_log_output_func output, void *private)  
-    `Function`: Register the custom log output function. The callback function is defined as: tlog_log_output_func. The TLOG_SEGMENT flag can be set during log initialization to return the callback to an independent full log.
+    `Function`: Register the custom log output function. The callback function is defined as: tlog_log_output_func. The TLOG_SEGMENT flag can be set during log initialization to return the callback to an independent full log.  
 
 1. tlog_setlevel(tlog_level level)  
 
-    `Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL.
+    `Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL.  
+
+1. tlog_getlevel()  
+
+    `Function`：Get log level.  
 
 1. tlog_setlogscreen(int enable)  
 
@@ -133,7 +179,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 1. tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)  
 
     `Function`: Initializes a new log stream. When finished, it is closed with tlog_cloese.  
-    `logfile`: log file  
+    `logfile`: log file.  
     `maxlogsize`: The maximum size of a single log file.  
     `maxlogcount`: The number of archived logs.  
     `buffsize`: The size of the buffer.  
@@ -150,11 +196,16 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `Function`: Turn off the log stream  
     `log`: The log stream handle.  
 
-1. tlog_printf(tlog_log *log, const char *format, ...) 
+1. tlog_printf(tlog_log *log, const char *format, ...)  
 
     `Function`: Print the log to the specified log stream  
     `log`: The log stream handle.  
     `format`: The log format.  
+
+1. tlog_out(tlog_log *log)  
+
+    `Function`: Print the log to the specified log stream, use `<<` output log like std::out  
+    `log`: The log stream handle.  
 
 1. tlog_vprintf(tlog_log *log, const char *format, va_list ap)  
 
