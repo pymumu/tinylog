@@ -60,7 +60,7 @@ struct tlog_time {
 /* enable log to screen */
 #define TLOG_SCREEN (1 << 4)
 
-struct tlog_info {
+struct tlog_loginfo {
     tlog_level level;
     const char *file;
     const char *func;
@@ -121,13 +121,13 @@ steps:
 
 read _tlog_format for example.
 */
-typedef int (*tlog_format_func)(char *buff, int maxlen, struct tlog_info *info, void *userptr, const char *format, va_list ap);
+typedef int (*tlog_format_func)(char *buff, int maxlen, struct tlog_loginfo *info, void *userptr, const char *format, va_list ap);
 extern int tlog_reg_format_func(tlog_format_func func);
 
 /* register log output callback 
  Note: info is invalid when flag TLOG_SEGMENT is not set.
  */
-typedef int (*tlog_log_output_func)(struct tlog_info *info, const char *buff, int bufflen, void *private_data);
+typedef int (*tlog_log_output_func)(struct tlog_loginfo *info, const char *buff, int bufflen, void *private_data);
 extern int tlog_reg_log_output_func(tlog_log_output_func output, void *private_data);
 
 struct tlog_log;
@@ -140,7 +140,7 @@ maxlogcount: Number of archived logs.
 buffsize: Buffer size, zero for default (128K)
 flag: read tlog flags
 return: log stream handler.
- */
+*/
 extern tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);
 
 /* write buff to log file */

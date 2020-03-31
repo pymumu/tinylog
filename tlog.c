@@ -94,7 +94,7 @@ struct tlog {
 };
 
 struct tlog_segment_log_head {
-    struct tlog_info info;
+    struct tlog_loginfo info;
     unsigned short len;
     char data[0];
 }  __attribute__((packed));
@@ -117,7 +117,7 @@ struct count_log {
 };
 
 struct tlog_info_inter {
-    struct tlog_info info;
+    struct tlog_loginfo info;
     void *userptr;
 };
 
@@ -203,8 +203,8 @@ static int _tlog_mkdir(const char *path)
 
 static struct tm *_tlog_localtime(time_t *timep, struct tm *tm)
 {
-    static time_t last_time = {0};
-    static struct tm last_tm = {0};
+    static time_t last_time;
+    static struct tm last_tm;
 
     /* localtime_r has a global timezone lock, it's about 8 times slower than gmtime
      * this code is used to speed up localtime_r call.
@@ -297,11 +297,14 @@ void *tlog_get_private(tlog_log *log)
     return log->private_data;
 }
 
-static int _tlog_format(char *buff, int maxlen, struct tlog_info *info, void *userptr, const char *format, va_list ap)
+static int _tlog_format(char *buff, int maxlen, struct tlog_loginfo *info, void *userptr, const char *format, va_list ap)
 {
     int len = 0;
     int total_len = 0;
     struct tlog_time *tm = &info->time;
+    void* unused __attribute__ ((unused));
+
+    unused = userptr;
 
     if (tlog.root->multi_log) {
         /* format prefix */
@@ -388,6 +391,9 @@ static int _tlog_print_buffer(char *buff, int maxlen, void *userptr, const char 
 {
     int len;
     int total_len = 0;
+    void* unused __attribute__ ((unused));
+
+    unused = userptr;
 
     /* format log message */
     len = vsnprintf(buff, maxlen, format, ap);
@@ -550,8 +556,9 @@ int tlog_printf(struct tlog_log *log, const char *format, ...)
 static int _tlog_early_print(const char *format, va_list ap) 
 {
     char log_buf[TLOG_MAX_LINE_LEN];
-    int len = 0;
-    int out_len = 0;
+    size_t len = 0;
+    size_t out_len = 0;
+    int unused __attribute__ ((unused));
 
     if (tlog_disable_early_print) {
         return 0;
@@ -565,9 +572,9 @@ static int _tlog_early_print(const char *format, va_list ap)
         out_len = sizeof(log_buf);
     }
 
-    write(STDOUT_FILENO, log_buf, out_len);
+    unused = write(STDOUT_FILENO, log_buf, out_len);
     if (log_buf[out_len - 1] != '\n') {
-        write(STDOUT_FILENO, "\n", 1);
+        unused = write(STDOUT_FILENO, "\n", 1);
     }
 
     return len;
@@ -650,6 +657,7 @@ static int _tlog_list_dir(const char *path, list_callback callback, void *userpt
     DIR *dir = NULL;
     struct dirent *ent;
     int ret = 0;
+    const char* unused __attribute__ ((unused)) = path;
 
     dir = opendir(path);
     if (dir == NULL) {
@@ -682,6 +690,7 @@ static int _tlog_count_log_callback(const char *path, struct dirent *entry, void
     struct count_log *count_log = (struct count_log *)userptr;
     struct tlog_log *log = count_log->log;
     char logname[TLOG_LOG_NAME_LEN * 2];
+    const char* unused __attribute__ ((unused)) = path;
 
     if (strstr(entry->d_name, log->suffix) == NULL) {
         return 0;
@@ -1008,6 +1017,7 @@ static int _tlog_archive_log(struct tlog_log *log)
 static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 {
     int len;
+    int unused __attribute__ ((unused));
 
     if (bufflen <= 0) {
         return 0;
@@ -1015,7 +1025,7 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 
      /* output log to screen */
     if (log->logscreen) {
-        write(STDOUT_FILENO, buff, bufflen);
+        unused = write(STDOUT_FILENO, buff, bufflen);
     }
 
     /* if log file size exceeds threshold, start to compress */
@@ -1027,7 +1037,7 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
         if (log->filesize < lseek(log->fd, 0, SEEK_END) && log->multi_log == 0) {
             const char *msg = "[Auto enable multi-process write mode, log may be lost, please enable multi-process write mode manually]\n";
             log->multi_log = 1;
-            write(log->fd, msg, strlen(msg));
+            unused = write(log->fd, msg, strlen(msg));
         }
         close(log->fd);
         log->fd = -1;
@@ -1326,7 +1336,10 @@ static void *_tlog_work(void *arg)
     int log_dropped = 0;
     struct tlog_log *log = NULL;
     struct tlog_log *loop_log = NULL;
+    void* unused __attribute__ ((unused));
 
+    unused = arg;
+    
     while (1) {
         log_len = 0;
         log_extlen = 0;
