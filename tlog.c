@@ -166,6 +166,10 @@ static int _tlog_mkdir(const char *path)
     if (access(path, F_OK) == 0) {
         return 0;
     }
+    
+    while(*path == ' ' && *path != '\0') {
+        path++;
+    }
 
     strncpy(path_c, path, sizeof(path_c) - 1);
     path_c[sizeof(path_c) - 1] = '\0';
@@ -177,6 +181,11 @@ static int _tlog_mkdir(const char *path)
     /* create directory recursively */
     while (*path_end != 0) {
         if (*path_end != '/') {
+            path_end++;
+            continue;
+        }
+
+        if (path_end == path_c) {
             path_end++;
             continue;
         }
