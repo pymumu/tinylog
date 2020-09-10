@@ -169,9 +169,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `功能`: 设置日志级别，有效参数为TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL  
 
-1. tlog_setlevel(tlog_level level)  
+1. tlog_getlevel(tlog_level level)  
 
     `功能`: 获取设置的日志级别。  
+
+1. tlog_set_logfile(const char *logfile)
+
+    `功能`: 设置日志文件。
+    `logfile`: 日志文件。  
 
 1. tlog_setlogscreen(int enable)  
 
@@ -242,6 +247,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `功能`: 获取私有参数，供回调函数中获取。  
     `log`: 日志流句柄。  
     `返回值`: 私有参数。  
+
+1. tlog_rename_logfile(tlog_log *log, const char *logfile)
+
+    `功能`: 重命名日志文件。  
+    `log`: 日志流句柄。  
+    `logfile`: 日志文件。  
 
 ## License
 

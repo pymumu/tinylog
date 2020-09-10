@@ -91,6 +91,9 @@ extern int tlog_setlevel(tlog_level level);
 /* get log level */
 extern tlog_level tlog_getlevel(void);
 
+/* set log file */
+extern void tlog_set_logfile(const char *logfile);
+
 /* enalbe log to screen */
 extern void tlog_setlogscreen(int enable);
 
@@ -148,6 +151,9 @@ extern int tlog_write(struct tlog_log *log, const char *buff, int bufflen);
 
 /* close log stream */
 extern void tlog_close(tlog_log *log);
+
+/* change log file */
+extern void tlog_rename_logfile(struct tlog_log *log, const char *logfile);
 
 /*
 Function: Print log to log stream

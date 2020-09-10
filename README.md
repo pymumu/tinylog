@@ -172,6 +172,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
 
     `Function`：Get log level.  
 
+1. tlog_set_logfile(const char *logfile)
+
+    `Function`：Update log file.
+    `logfile`: log file  
+
 1. tlog_setlogscreen(int enable)  
 
     `Function`：set whether the log is output to screen.  
@@ -240,6 +245,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `Function`: Get the private parameter, which is obtained from the callback function.  
     `log`: The log stream handle.  
     `return value`: private parameter.  
+
+1. tlog_rename_logfile(tlog_log *log, const char *logfile)
+
+    `Function`: Rename log file.  
+    `log`: The log stream handle.  
+    `logfile`: log file.  
+
 
 ## License
 

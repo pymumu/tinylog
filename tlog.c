@@ -57,6 +57,8 @@ struct tlog_log {
     char logdir[PATH_MAX];
     char logname[TLOG_LOG_NAME_LEN];
     char suffix[TLOG_LOG_NAME_LEN];
+    char pending_logfile[PATH_MAX];
+    int rename_pending;
     int logsize;
     int logcount;
     int block;
@@ -1023,6 +1025,26 @@ static int _tlog_archive_log(struct tlog_log *log)
     }
 }
 
+void _tlog_get_log_name_dir(struct tlog_log *log)
+{
+    char log_file[PATH_MAX];
+    if (log->fd > 0) {
+        close(log->fd);
+        log->fd = -1;
+    }
+
+    pthread_mutex_lock(&tlog.lock);
+    strncpy(log_file, log->pending_logfile, sizeof(log_file) - 1);
+    log_file[sizeof(log_file) - 1] = '\0';
+    strncpy(log->logdir, dirname(log_file), sizeof(log->logdir));
+    log->logdir[sizeof(log->logdir) - 1] = '\0';
+    strncpy(log_file, log->pending_logfile, PATH_MAX);
+    log_file[sizeof(log_file) - 1] = '\0';
+    strncpy(log->logname, basename(log_file), sizeof(log->logname));
+    log->logname[sizeof(log->logname) - 1] = '\0';   
+    pthread_mutex_unlock(&tlog.lock);
+}
+
 static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 {
     int len;
@@ -1030,6 +1052,11 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 
     if (bufflen <= 0) {
         return 0;
+    }
+
+    if (log->rename_pending) {
+        _tlog_get_log_name_dir(log);
+        log->rename_pending = 0;
     }
 
      /* output log to screen */
@@ -1518,10 +1545,14 @@ tlog_level tlog_getlevel(void)
     return tlog_set_level;
 }
 
+void tlog_set_logfile(const char *logfile)
+{
+    tlog_rename_logfile(tlog.root, logfile);
+}
+
 tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)
 {
     struct tlog_log *log = NULL;
-    char log_file[PATH_MAX];
 
     if (tlog.run == 0) {
         fprintf(stderr, "tlog is not initialized.");
@@ -1554,14 +1585,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->segment_log = ((flag & TLOG_SEGMENT) == 0) ? 0 : 1;
     log->output_func = _tlog_write;
 
-    strncpy(log_file, logfile, sizeof(log_file) - 1);
-    log_file[sizeof(log_file) - 1] = '\0';
-    strncpy(log->logdir, dirname(log_file), sizeof(log->logdir));
-    log->logdir[sizeof(log->logdir) - 1] = '\0';
-    strncpy(log_file, logfile, PATH_MAX);
-    log_file[sizeof(log_file) - 1] = '\0';
-    strncpy(log->logname, basename(log_file), sizeof(log->logname));
-    log->logname[sizeof(log->logname) - 1] = '\0';
+    tlog_rename_logfile(log, logfile);
     if (log->nocompress) {
         strncpy(log->suffix, TLOG_SUFFIX_LOG, sizeof(log->suffix));
     } else {
@@ -1603,6 +1627,14 @@ void tlog_close(tlog_log *log)
     }
 
     log->is_exit = 1;
+}
+
+void tlog_rename_logfile(struct tlog_log *log, const char *logfile)
+{
+    pthread_mutex_lock(&tlog.lock);
+    strncpy(log->pending_logfile, logfile, sizeof(log->pending_logfile) - 1);
+    pthread_mutex_unlock(&tlog.lock);
+    log->rename_pending = 1;
 }
 
 int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)
