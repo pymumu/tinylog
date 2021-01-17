@@ -142,6 +142,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     * `TLOG_SEGMENT`: 日志分段，用于注册回调函数后，返回一条完整的日志用于后续处理。  
     * `TLOG_NONBLOCK`: 缓冲区不足时，不阻塞。  
     * `TLOG_SCREEN`: 输出日志到屏幕。  
+    * `TLOG_SUPPORT_FORK`: 支持fork运行的进程。
 
 1. tlog(level, format, ...)  
 

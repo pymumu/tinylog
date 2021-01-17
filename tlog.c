@@ -61,6 +61,7 @@ struct tlog_log {
     char suffix[TLOG_LOG_NAME_LEN];
     char pending_logfile[PATH_MAX];
     int rename_pending;
+    int fail;
     int logsize;
     int logcount;
     int block;
@@ -1072,7 +1073,7 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
     int len;
     int unused __attribute__ ((unused));
 
-    if (bufflen <= 0) {
+    if (bufflen <= 0 || log->fail) {
         return 0;
     }
 
@@ -1599,6 +1600,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->filesize = 0;
     log->zip_pid = -1;
     log->is_exit = 0;
+    log->fail = 0;
     log->waiters = 0;
     log->block = ((flag & TLOG_NONBLOCK) == 0) ? 1 : 0;
     log->nocompress = ((flag & TLOG_NOCOMPRESS) == 0) ? 0 : 1;
@@ -1660,6 +1662,48 @@ void tlog_rename_logfile(struct tlog_log *log, const char *logfile)
     log->rename_pending = 1;
 }
 
+static void tlog_fork_prepare() {
+    if (tlog.root == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&tlog.lock);
+}
+
+static void tlog_fork_parent() {
+    if (tlog.root == NULL) {
+        return;
+    }
+
+    pthread_mutex_unlock(&tlog.lock);
+}
+
+static void tlog_fork_child() {
+    pthread_attr_t attr;
+    tlog_log *next;
+    if (tlog.root == NULL) {
+        return;
+    }
+
+    pthread_attr_init(&attr);
+    int ret = pthread_create(&tlog.tid, &attr, _tlog_work, NULL);
+    if (ret != 0) {
+        fprintf(stderr, "create tlog work thread failed, %s\n", strerror(errno));
+        goto errout;
+    }
+
+    goto out;
+errout:
+    next = tlog.log;
+    while (next) {
+        next->fail = 1;
+        next = next->next;
+    }
+out:
+    pthread_mutex_unlock(&tlog.lock);
+
+}
+
 int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag)
 {
     pthread_attr_t attr;
@@ -1700,6 +1744,9 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize
     }
 
     tlog.root = log;
+    if (flag & TLOG_SUPPORT_FORK) {
+        pthread_atfork(&tlog_fork_prepare, &tlog_fork_parent, &tlog_fork_child);
+    }
     return 0;
 errout:
     if (tlog.tid > 0) {

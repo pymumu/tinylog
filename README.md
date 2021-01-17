@@ -140,7 +140,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     * `TLOG_NOCOMPRESS`: The archive log is not compressed.  
     * `TLOG_SEGMENT`: Log segmentation, used to register the callback function, returns a complete log for subsequent processing.  
     * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
-    * `TLOG_SCREEN`: Output logs to the screen.  
+    * `TLOG_SCREEN`: Output logs to the screen.
+    * `TLOG_SUPPORT_FORK`: Support fork process.
 
 1. tlog(level, format, ...)  
 
@@ -251,7 +252,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
     `Function`: Rename log file.  
     `log`: The log stream handle.  
     `logfile`: log file.  
-
 
 ## License
 

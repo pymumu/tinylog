@@ -60,6 +60,9 @@ struct tlog_time {
 /* enable log to screen */
 #define TLOG_SCREEN (1 << 4)
 
+/* enable suppport fork process */
+#define TLOG_SUPPORT_FORK (1 << 5)
+
 struct tlog_loginfo {
     tlog_level level;
     const char *file;
