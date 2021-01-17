@@ -40,6 +40,8 @@
 #define TLOG_BUFF_LEN (PATH_MAX + TLOG_LOG_NAME_LEN * 3)
 #define TLOG_SUFFIX_GZ ".gz"
 #define TLOG_SUFFIX_LOG ""
+#define TLOG_MAX_LINE_SIZE_SET (1024 * 8)
+#define TLOG_MIN_LINE_SIZE_SET (128)
 
 #define TLOG_SEGMENT_MAGIC 0xFF446154
 
@@ -68,7 +70,8 @@ struct tlog_log {
     int multi_log;
     int logscreen;
     int segment_log;
- 
+    unsigned int max_line_size;
+
     tlog_output_func output_func;
     void *private_data;
 
@@ -285,9 +288,28 @@ static int _tlog_gettime(struct tlog_time *cur_time)
     return 0;
 }
 
+void tlog_set_maxline_size(struct tlog_log *log, int size)
+{
+    if (log == NULL) {
+        return;
+    }
+
+    if (size < TLOG_MIN_LINE_SIZE_SET) {
+        size = TLOG_MIN_LINE_SIZE_SET;
+    } else if ( size >  TLOG_MAX_LINE_SIZE_SET) {
+        size = TLOG_MAX_LINE_SIZE_SET;
+    } 
+        
+    log->max_line_size = size;
+}
+
 int tlog_localtime(struct tlog_time *tm)
 {
     return _tlog_gettime(tm);
+}
+
+tlog_log *tlog_get_root() {
+    return tlog.root;
 }
 
 void tlog_set_private(tlog_log *log, void *private_data)
@@ -440,7 +462,7 @@ static int _tlog_need_drop(struct tlog_log *log)
     }
 
     /* if free buffer length is less than min line length */
-    if (maxlen < TLOG_MAX_LINE_LEN) {
+    if (maxlen < log->max_line_size) {
         log->dropped++;
         ret = 0;
     }
@@ -452,13 +474,13 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
 {
     int len;
     int maxlen = 0;
-    char buff[TLOG_MAX_LINE_LEN];
-
     struct tlog_segment_head *segment_head = NULL;
 
     if (log == NULL || format == NULL) {
         return -1;
     }
+
+    char buff[log->max_line_size];
 
     if (log->buff == NULL) {
         return -1;
@@ -471,7 +493,7 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
     len = print_callback(buff, sizeof(buff), userptr, format, ap);
     if (len <= 0) {
         return -1;
-    } else if (len >= TLOG_MAX_LINE_LEN) {
+    } else if (len >= log->max_line_size) {
         strncpy(buff, "[LOG TOO LONG, DISCARD]\n", sizeof(buff));
         buff[sizeof(buff) - 1] = '\0';
         len = strnlen(buff, sizeof(buff));
@@ -492,7 +514,7 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
         }
 
         /* if free buffer length is less than min line length */
-        if (maxlen < TLOG_MAX_LINE_LEN) {
+        if (maxlen < log->max_line_size) {
             if (log->end != log->start) {
                 tlog.notify_log = log;
                 pthread_cond_signal(&tlog.cond);
@@ -518,7 +540,7 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
 
             pthread_mutex_lock(&tlog.lock);
         }
-    } while (maxlen < TLOG_MAX_LINE_LEN);
+    } while (maxlen < log->max_line_size);
 
     if (log->segment_log) {
         segment_head = (struct tlog_segment_head *)(log->buff + log->end);
@@ -534,7 +556,7 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
     }
 
     /* if remain buffer is not enough for a line, move end to start of buffer. */
-    if (log->end > log->buffsize - TLOG_MAX_LINE_LEN) {
+    if (log->end > log->buffsize - log->max_line_size) {
         log->ext_end = log->end;
         log->end = 0;
     }
@@ -1583,6 +1605,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->logscreen = ((flag & TLOG_SCREEN) == 0) ? 0 : 1;
     log->multi_log = ((flag & TLOG_MULTI_WRITE) == 0) ? 0 : 1;
     log->segment_log = ((flag & TLOG_SEGMENT) == 0) ? 0 : 1;
+    log->max_line_size = TLOG_MAX_LINE_LEN;
     log->output_func = _tlog_write;
 
     tlog_rename_logfile(log, logfile);
@@ -1648,7 +1671,7 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize
         return -1;
     }
 
-    if (buffsize > 0 && buffsize < TLOG_MAX_LINE_LEN * 2) {
+    if (buffsize > 0 && buffsize < TLOG_MAX_LINE_SIZE_SET * 2) {
         fprintf(stderr, "buffer size is invalid.\n");
         return -1;
     }

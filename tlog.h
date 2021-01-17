@@ -103,6 +103,7 @@ extern void tlog_set_early_printf(int enable);
 /* Get log level in string */
 extern const char *tlog_get_level_string(tlog_level level);
 
+
 /*
 Function: Initialize log module
 logfile: log file.
@@ -135,6 +136,10 @@ extern int tlog_reg_log_output_func(tlog_log_output_func output, void *private_d
 
 struct tlog_log;
 typedef struct tlog_log tlog_log;
+
+/* get root log handler */
+extern tlog_log *tlog_get_root();
+
 /*
 Function: open a new log stream, handler should close by tlog_close
 logfile: log file.
@@ -185,6 +190,9 @@ extern void *tlog_get_private(tlog_log *log);
 
 /* get local time */
 extern int tlog_localtime(struct tlog_time *tm);
+
+/* set max line size */
+extern void tlog_set_maxline_size(struct tlog_log *log, int size);
 
 #ifdef __cplusplus
 class Tlog {
