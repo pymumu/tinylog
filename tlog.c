@@ -78,6 +78,8 @@ struct tlog_log {
 
     time_t last_try;
     time_t last_waitpid;
+    mode_t file_perm;
+    mode_t archive_perm;
 
     int waiters;
     int is_exit;
@@ -302,6 +304,12 @@ void tlog_set_maxline_size(struct tlog_log *log, int size)
     }
 
     log->max_line_size = size;
+}
+
+void tlog_set_permission(struct tlog_log *log, unsigned int file, unsigned int archive)
+{
+    log->file_perm = file;
+    log->archive_perm = archive;
 }
 
 int tlog_localtime(struct tlog_time *tm)
@@ -683,6 +691,8 @@ static int _tlog_rename_logfile(struct tlog_log *log, const char *log_file)
     if (rename(log_file, archive_file) != 0) {
         return -1;
     }
+
+    chmod(archive_file, log->archive_perm);
 
     return 0;
 }
@@ -1123,7 +1133,7 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
         }
         snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
         log->filesize = 0;
-        log->fd = open(logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, 0640);
+        log->fd = open(logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, log->file_perm);
         if (log->fd < 0) {
             if (print_errmsg == 0) {
                 return -1;
@@ -1608,6 +1618,8 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->segment_log = ((flag & TLOG_SEGMENT) == 0) ? 0 : 1;
     log->max_line_size = TLOG_MAX_LINE_LEN;
     log->output_func = _tlog_write;
+    log->file_perm = S_IRUSR | S_IWUSR | S_IRGRP;
+    log->archive_perm = S_IRUSR | S_IRGRP;
 
     tlog_rename_logfile(log, logfile);
     if (log->nocompress) {
