@@ -1673,7 +1673,7 @@ void tlog_rename_logfile(struct tlog_log *log, const char *logfile)
     log->rename_pending = 1;
 }
 
-static void tlog_fork_prepare()
+static void tlog_fork_prepare(void)
 {
     if (tlog.root == NULL) {
         return;
@@ -1682,7 +1682,7 @@ static void tlog_fork_prepare()
     pthread_mutex_lock(&tlog.lock);
 }
 
-static void tlog_fork_parent()
+static void tlog_fork_parent(void)
 {
     if (tlog.root == NULL) {
         return;
@@ -1691,7 +1691,7 @@ static void tlog_fork_parent()
     pthread_mutex_unlock(&tlog.lock);
 }
 
-static void tlog_fork_child()
+static void tlog_fork_child(void)
 {
     pthread_attr_t attr;
     tlog_log *next;

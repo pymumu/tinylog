@@ -141,7 +141,7 @@ struct tlog_log;
 typedef struct tlog_log tlog_log;
 
 /* get root log handler */
-extern tlog_log *tlog_get_root();
+extern tlog_log *tlog_get_root(void);
 
 /*
 Function: open a new log stream, handler should close by tlog_close
