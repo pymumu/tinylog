@@ -317,7 +317,7 @@ int tlog_localtime(struct tlog_time *tm)
     return _tlog_gettime(tm);
 }
 
-tlog_log *tlog_get_root()
+tlog_log *tlog_get_root(void)
 {
     return tlog.root;
 }
