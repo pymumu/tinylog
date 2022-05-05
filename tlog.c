@@ -1834,6 +1834,7 @@ void tlog_exit(void)
         pthread_cond_signal(&tlog.cond);
         pthread_mutex_unlock(&tlog.lock);
         pthread_join(tlog.tid, &ret);
+        tlog.tid = 0;
     }
 
     tlog.root = NULL;
@@ -1843,4 +1844,7 @@ void tlog_exit(void)
 
     pthread_cond_destroy(&tlog.cond);
     pthread_mutex_destroy(&tlog.lock);
+
+    tlog_format = NULL;
+    tlog.is_wait = 0;
 }
