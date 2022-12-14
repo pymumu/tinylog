@@ -80,7 +80,8 @@ struct tlog_log {
     int multi_log;
     int logscreen;
     int segment_log;
-    unsigned int max_line_size;
+    int max_line_size;
+    int print_errmsg;
 
     tlog_output_func output_func;
     void *private_data;
@@ -216,7 +217,6 @@ static int _tlog_mkdir(const char *path)
         }
 
         if (mkdir(path_c, 0750) != 0) {
-            fprintf(stderr, "create directory %s failed, %s\n", path_c, strerror(errno));
             return -1;
         }
 
@@ -313,6 +313,19 @@ void tlog_set_maxline_size(struct tlog_log *log, int size)
     }
 
     log->max_line_size = size;
+}
+
+void tlog_logcount(struct tlog_log *log, int count)
+{
+    if (log == NULL) {
+        return;
+    }
+
+    if (count < 0) {
+        count = 0;
+    }
+
+    log->logcount = count;
 }
 
 void tlog_set_permission(struct tlog_log *log, unsigned int file, unsigned int archive)
@@ -503,6 +516,10 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
 
     if (log->buff == NULL) {
         return -1;
+    }
+
+    if (unlikely(log->logcount <= 0 && log->logscreen == 0) ) {
+        return 0;
     }
 
     if (_tlog_need_drop(log) == 0) {
@@ -1091,7 +1108,7 @@ static int _tlog_archive_log(struct tlog_log *log)
     }
 }
 
-void _tlog_get_log_name_dir(struct tlog_log *log)
+static void _tlog_get_log_name_dir(struct tlog_log *log)
 {
     char log_file[PATH_MAX];
     if (log->fd > 0) {
@@ -1130,6 +1147,10 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
         unused = write(STDOUT_FILENO, buff, bufflen);
     }
 
+    if (log->logcount <= 0) {
+        return 0;
+    }
+
     /* if log file size exceeds threshold, start to compress */
     if (log->multi_log && log->fd > 0) {
         log->filesize = lseek(log->fd, 0, SEEK_END);
@@ -1149,7 +1170,6 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 
     if (log->fd <= 0) {
         /* open a new log file to write */
-        static int print_errmsg = 1;
         time_t now;
 
         time(&now);
@@ -1160,24 +1180,33 @@ static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 
         char logfile[PATH_MAX * 2];
         if (_tlog_mkdir(log->logdir) != 0) {
-            fprintf(stderr, "create log dir %s failed.\n", log->logdir);
+            if (log->print_errmsg == 0) {
+                return -1;
+            }
+            log->print_errmsg = 0;
+            fprintf(stderr, "create log dir %s failed, %s\n", log->logdir, strerror(errno));
+            if (errno == EACCES && log->logscreen == 0) {
+                fprintf(stderr, "no permission to write log file, output log to console\n");
+                tlog_logscreen(log, 1);
+                tlog_logcount(log, 0);
+            }
             return -1;
         }
         snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
         log->filesize = 0;
         log->fd = open(logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, log->file_perm);
         if (log->fd < 0) {
-            if (print_errmsg == 0) {
+            if (log->print_errmsg == 0) {
                 return -1;
             }
 
             fprintf(stderr, "open log file %s failed, %s\n", logfile, strerror(errno));
-            print_errmsg = 0;
+            log->print_errmsg = 0;
             return -1;
         }
 
         log->last_try = 0;
-        print_errmsg = 1;
+        log->print_errmsg = 1;
         /* get log file size */
         log->filesize = lseek(log->fd, 0, SEEK_END);
     }
@@ -1565,6 +1594,11 @@ const char *tlog_get_level_string(tlog_level level)
     return tlog_level_str[level];
 }
 
+void tlog_set_maxlog_count(int count)
+{
+    tlog_logcount(tlog.root, count);
+}
+
 static void _tlog_log_setlogscreen(struct tlog_log *log, int enable)
 {
     if (log == NULL) {
@@ -1668,12 +1702,13 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->dropped = 0;
     log->buffsize = (buffsize > 0) ? buffsize : TLOG_BUFF_SIZE;
     log->logsize = (maxlogsize >= 0) ? maxlogsize : TLOG_LOG_SIZE;
-    log->logcount = (maxlogcount > 0) ? maxlogcount : TLOG_LOG_COUNT;
+    log->logcount = (maxlogcount <= 0) ? 0 : maxlogcount;
     log->fd = -1;
     log->filesize = 0;
     log->zip_pid = -1;
     log->is_exit = 0;
     log->fail = 0;
+    log->print_errmsg = 1;
     log->waiters = 0;
     log->block = ((flag & TLOG_NONBLOCK) == 0) ? 1 : 0;
     log->nocompress = ((flag & TLOG_NOCOMPRESS) == 0) ? 0 : 1;
@@ -1830,27 +1865,29 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize
     }
     tlog_reg_output_func(log, _tlog_root_write_log);
 
+    tlog.root = log;
     ret = pthread_create(&tlog.tid, &attr, _tlog_work, NULL);
     if (ret != 0) {
         fprintf(stderr, "create tlog work thread failed, %s\n", strerror(errno));
         goto errout;
     }
 
-    tlog.root = log;
     if (flag & TLOG_SUPPORT_FORK) {
         pthread_atfork(&tlog_fork_prepare, &tlog_fork_parent, &tlog_fork_child);
     }
     return 0;
 errout:
-    if (tlog.tid > 0) {
+    if (tlog.tid) {
         void *retval = NULL;
         tlog.run = 0;
         pthread_join(tlog.tid, &retval);
+        tlog.tid = 0;
     }
 
     pthread_cond_destroy(&tlog.cond);
     pthread_mutex_destroy(&tlog.lock);
     tlog.run = 0;
+    tlog.root = NULL;
 
     _tlog_close(log, 1);
 
@@ -1859,7 +1896,7 @@ errout:
 
 void tlog_exit(void)
 {
-    if (tlog.tid > 0) {
+    if (tlog.tid) {
         void *ret = NULL;
         tlog.run = 0;
         pthread_mutex_lock(&tlog.lock);

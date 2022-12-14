@@ -113,20 +113,6 @@ total 11564
     }
     ```
 
-If you want filename wihout path in log, you can specify the macro BASE_FILE_NAME as the filename and generate as short file name when compiling. example as follows: (please check makefile in example directory.)  
-For makefile:
-
-```C
-CFLAGS += -DBASE_FILE_NAME=\"$(notdir $<)\"
-```
-
-For cmake:
-
-```C
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBASE_FILE_NAME='\"$(notdir $<)\"'")
-```
-
 ## API description
 
 1. int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize, unsigned int flag);  
