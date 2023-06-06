@@ -154,7 +154,7 @@ total 11564
 
 1. tlog_setlevel(tlog_level level)  
 
-    `功能`: 设置日志级别，有效参数为TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL  
+    `功能`: 设置日志级别，有效参数为TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL, TLOG_OFF  
 
 1. tlog_getlevel(tlog_level level)  
 

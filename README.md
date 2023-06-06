@@ -153,7 +153,7 @@ total 11564
 
 1. tlog_setlevel(tlog_level level)  
 
-    `Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL.  
+    `Function`：Set log level，valid level are :TLOG_DEBUG, TLOG_INFO, TLOG_NOTICE, TLOG_WARN, TLOG_ERROR, TLOG_FATAL, TLOG_OFF   
 
 1. tlog_getlevel()  
 
