@@ -34,6 +34,7 @@ total 11564
 8. Multithreading concurrent write.
 9. Multiprcessing concurrent write.
 10. c++ std::cout sytle log function.
+11. Output log with color.
 
 ## Usage
 
@@ -55,6 +56,26 @@ total 11564
     {
         tlog_init("example.log", 1024 * 1024, 8, 0, 0);
         tlog(TLOG_INFO, "This is a log message.\n");
+        tlog_exit();
+        return 0;
+    }
+    ```
+
+1. Ouutput log with color.
+
+    ```c
+    #include <stdio.h>
+    #include "tlog.h"
+
+    int main(int argc, char *argv[])
+    {
+        tlog_init("example.log", 1024 * 1024, 8, 0, TLOG_SCREEN_COLOR);
+        tlog_debug("This is a debug message.");    
+        tlog_info("This is a log message.");
+        tlog_notice("This is a notice message.");
+        tlog_warn("This is a warn message.");
+        tlog_error("This is a error message.");
+        tlog_fatal("This is a fatal message.");
         tlog_exit();
         return 0;
     }
@@ -181,6 +202,7 @@ total 11564
     * `TLOG_SEGMENT`: Log segmentation, used to register the callback function, returns a complete log for subsequent processing.  
     * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
     * `TLOG_SCREEN`: Output logs to the screen.  
+    * `TLOG_SCREEN_COLOR`: Outlog logs to the screen with color.
     `return value`: log stream handle.  
 
 1. tlog_close(tlog_log *log)  

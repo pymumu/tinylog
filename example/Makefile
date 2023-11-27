@@ -15,4 +15,4 @@ $(BIN):$(OBJS)
 	$(CXX) $^ -o $@ $(LIBS)
 
 clean:
-	$(RM) $(BIN) $(OBJS)
+	$(RM) $(BIN) $(OBJS) *.o *.log

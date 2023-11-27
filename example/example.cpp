@@ -6,8 +6,14 @@ int main(int argc, char *argv[])
     tlog_log *log = NULL;
 
     /* init and output log message */
-    tlog_init("example.log", 1024 * 1024, 8, 0, 0);
+    tlog_init("example.log", 1024 * 1024, 8, 0, TLOG_SCREEN_COLOR);
+    tlog_setlevel(TLOG_DEBUG);
+    tlog(TLOG_DEBUG, "This is a debug message.\n");
     tlog(TLOG_INFO, "This is a log message.\n");
+    tlog(TLOG_NOTICE, "This is a notice message.\n");
+    tlog(TLOG_WARN, "This is a warn message.\n");
+    tlog(TLOG_ERROR, "This is a error message.\n");
+    tlog(TLOG_FATAL, "This is a fatal message.\n");
 
     /* c++ cout style log */
     tlog_info << "This is a c++ style log.\n";
