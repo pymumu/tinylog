@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(tlog)
 
+include(GNUInstallDirs)
+
 add_library(tlog SHARED)
 target_sources(tlog PRIVATE tlog.c)
 
