@@ -150,6 +150,7 @@ total 11564
     * `TLOG_NONBLOCK`: 缓冲区不足时，不阻塞。  
     * `TLOG_SCREEN`: 输出日志到屏幕。  
     * `TLOG_SUPPORT_FORK`: 支持fork运行的进程。
+    * `TLOG_SCREEN_COLOR`: 按颜色输出日志到屏幕。  
 
 1. tlog(level, format, ...)  
 
@@ -203,8 +204,7 @@ total 11564
     * `TLOG_NOCOMPRESS`: 归档日志不进行压缩。  
     * `TLOG_SEGMENT`: 日志分段，用于注册回调函数后，返回一条完整的日志用于后续处理。  
     * `TLOG_NOBLOCK`: 缓冲区不足时，不阻塞。  
-    * `TLOG_SCREEN`: 输出日志到屏幕。 
-    * `TLOG_SCREEN_COLOR`: 按颜色输出日志到屏幕。 
+    * `TLOG_SCREEN`: 输出日志到屏幕。  
     `返回值`: 日志流句柄。
 
 1. tlog_close(tlog_log *log)  

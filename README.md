@@ -61,7 +61,7 @@ total 11564
     }
     ```
 
-1. Ouutput log with color.
+1. Output log with color.
 
     ```c
     #include <stdio.h>
@@ -149,6 +149,7 @@ total 11564
     * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
     * `TLOG_SCREEN`: Output logs to the screen.
     * `TLOG_SUPPORT_FORK`: Support fork process.
+    * `TLOG_SCREEN_COLOR`: Output logs to the screen with color.  
 
 1. tlog(level, format, ...)  
 
@@ -202,7 +203,6 @@ total 11564
     * `TLOG_SEGMENT`: Log segmentation, used to register the callback function, returns a complete log for subsequent processing.  
     * `TLOG_NONBLOCK`: Do not block when buffer is insufficient.  
     * `TLOG_SCREEN`: Output logs to the screen.  
-    * `TLOG_SCREEN_COLOR`: Outlog logs to the screen with color.
     `return value`: log stream handle.  
 
 1. tlog_close(tlog_log *log)  
