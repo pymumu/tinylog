@@ -1236,6 +1236,7 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
 {
     int len;
     int unused __attribute__((unused));
+    char logfile[PATH_MAX * 2] = {0};
 
     if (bufflen <= 0 || log->fail) {
         return 0;
@@ -1267,9 +1268,17 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         _tlog_archive_log(log);
     }
 
-    if (log->fd <= 0) {
+    snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
+
+    if ((log->fd <= 0)
+        || (0 != access(logfile, F_OK))) {
         /* open a new log file to write */
         time_t now;
+        
+        if (log->fd > 0) {
+                close(log->fd);
+                log->fd = -1;
+        }
 
         time(&now);
         if (now == log->last_try) {
@@ -1277,7 +1286,6 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         }
         log->last_try = now;
 
-        char logfile[PATH_MAX * 2];
         if (_tlog_mkdir(log->logdir) != 0) {
             if (log->print_errmsg == 0) {
                 return -1;
@@ -1291,7 +1299,7 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
             }
             return -1;
         }
-        snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
+
         log->filesize = 0;
         log->fd = open(logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, log->file_perm);
         if (log->fd < 0) {
