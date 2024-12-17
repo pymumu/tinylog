@@ -69,6 +69,7 @@ struct tlog_log {
     char logname[TLOG_LOG_NAME_LEN];
     char suffix[TLOG_LOG_NAME_LEN];
     char pending_logfile[PATH_MAX];
+    char logfile[PATH_MAX * 2];
     int rename_pending;
     int fail;
     int logsize;
@@ -1212,6 +1213,7 @@ static void _tlog_get_log_name_dir(struct tlog_log *log)
     log_file[sizeof(log_file) - 1] = '\0';
     strncpy(log->logname, basename(log_file), sizeof(log->logname) - 1);
     log->logname[sizeof(log->logname) - 1] = '\0';
+    snprintf(log->logfile, sizeof(log->logfile), "%s/%s", log->logdir, log->logname);
     pthread_mutex_unlock(&tlog.lock);
 }
 
@@ -1236,7 +1238,6 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
 {
     int len;
     int unused __attribute__((unused));
-    char logfile[PATH_MAX * 2] = {0};
     struct stat sb = { 0 };
 
     if (bufflen <= 0 || log->fail) {
@@ -1269,7 +1270,6 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         _tlog_archive_log(log);
     }
 
-    snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
 
     if ((log->fd <= 0)
         || ((0 == fstat(log->fd, &sb))
@@ -1304,13 +1304,13 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         }
 
         log->filesize = 0;
-        log->fd = open(logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, log->file_perm);
+        log->fd = open(log->logfile, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, log->file_perm);
         if (log->fd < 0) {
             if (log->print_errmsg == 0) {
                 return -1;
             }
 
-            fprintf(stderr, "tlog: open log file %s failed, %s\n", logfile, strerror(errno));
+            fprintf(stderr, "tlog: open log file %s failed, %s\n", log->logfile, strerror(errno));
             log->print_errmsg = 0;
             return -1;
         }
