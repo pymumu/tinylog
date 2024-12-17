@@ -1237,6 +1237,7 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
     int len;
     int unused __attribute__((unused));
     char logfile[PATH_MAX * 2] = {0};
+    struct stat sb = { 0 };
 
     if (bufflen <= 0 || log->fail) {
         return 0;
