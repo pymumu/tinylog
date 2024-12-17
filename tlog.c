@@ -1271,7 +1271,9 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
     snprintf(logfile, sizeof(logfile), "%s/%s", log->logdir, log->logname);
 
     if ((log->fd <= 0)
-        || (0 != access(logfile, F_OK))) {
+        || ((0 == fstat(log->fd, &sb))
+            && (0 == sb.st_nlink))      // log file was deleted
+    ){
         /* open a new log file to write */
         time_t now;
         
