@@ -996,7 +996,9 @@ static void _tlog_wait_pid(struct tlog_log *log, int wait_hang)
     int option = (wait_hang == 0) ? WNOHANG : 0;
     /* check and obtain gzip process status*/
     if (waitpid(log->zip_pid, &status, option) <= 0) {
-        return;
+        if (errno != ECHILD || errno == EINTR) {
+            return;
+        }
     }
 
     /* gzip process exited */
