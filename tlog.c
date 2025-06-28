@@ -1,6 +1,6 @@
 /*
  * tinylog
- * Copyright (C) 2018-2024 Nick Peng <pymumu@gmail.com>
+ * Copyright (C) 2018-2025 Nick Peng <pymumu@gmail.com>
  * https://github.com/pymumu/tinylog
  */
 #ifndef _GNU_SOURCE
@@ -87,6 +87,7 @@ struct tlog_log {
 
     tlog_output_func output_func;
     void *private_data;
+    int set_custom_output_func;
 
     time_t last_try;
     time_t last_waitpid;
@@ -190,7 +191,7 @@ static inline void _tlog_spin_unlock(unsigned int *lock)
 
 static int _tlog_mkdir(const char *path)
 {
-    char path_c[PATH_MAX];
+    char path_c[PATH_MAX + 1];
     char *path_end;
     char str;
     int len;
@@ -533,7 +534,7 @@ static int _tlog_vprintf(struct tlog_log *log, vprint_callback print_callback, v
         return -1;
     }
 
-    if (unlikely(log->logcount <= 0 && log->logscreen == 0)) {
+    if (unlikely(log->logcount <= 0 && log->logscreen == 0 && log->set_custom_output_func == 0)) {
         return 0;
     }
 
@@ -761,7 +762,7 @@ int tlog_vext(tlog_level level, const char *file, int line, const char *func, vo
         return _tlog_early_print(&info_inter, format, ap);
     }
 
-    if (unlikely(tlog.root->logsize <= 0)) {
+    if (unlikely(tlog.root->logsize <= 0 && tlog.root->logscreen == 0 && tlog.root->set_custom_output_func == 0)) {
         return 0;
     }
 
@@ -892,7 +893,7 @@ static int _tlog_get_oldest_callback(const char *path, struct dirent *entry, voi
 
     if (oldestlog->mtime == 0 || oldestlog->mtime > sb.st_mtime) {
         oldestlog->mtime = sb.st_mtime;
-        strncpy(oldestlog->name, entry->d_name, sizeof(oldestlog->name));
+        strncpy(oldestlog->name, entry->d_name, sizeof(oldestlog->name) - 1);
         oldestlog->name[sizeof(oldestlog->name) - 1] = '\0';
         return 0;
     }
@@ -1081,16 +1082,17 @@ static void _tlog_close_all_fd(void)
         }
     }
 
-    close(dir_fd);
 
     if (bytes < 0) {
         goto errout;
     }
 
+    close(dir_fd);
     return;
 errout:
     if (dir_fd > 0) {
         close(dir_fd);
+        dir_fd = -1;
     }
 #endif
     _tlog_close_all_fd_by_res();
@@ -1198,7 +1200,7 @@ static int _tlog_archive_log(struct tlog_log *log)
 
 static void _tlog_get_log_name_dir(struct tlog_log *log)
 {
-    char log_file[PATH_MAX];
+    char log_file[PATH_MAX + 1];
     if (log->fd > 0) {
         close(log->fd);
         log->fd = -1;
@@ -1234,7 +1236,7 @@ static int _tlog_write_screen(struct tlog_log *log, struct tlog_loginfo *info, c
     return tlog_stdout_with_color(info->level, buff, bufflen);
 }
 
-static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, const char *buff, int bufflen)
+static int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
 {
     int len;
     int unused __attribute__((unused));
@@ -1249,7 +1251,7 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         log->rename_pending = 0;
     }
 
-    if (log->logcount <= 0) {
+    if (log->logcount <= 0 || log->logsize <= 0) {
         return 0;
     }
 
@@ -1271,10 +1273,10 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
     }
 
 
-    if ((log->fd <= 0)
+    if ((log->fd <= 0 && log->logsize > 0)
         || ((0 == fstat(log->fd, &sb))
             && (0 == sb.st_nlink))      // log file was deleted
-    ){
+    ) {
         /* open a new log file to write */
         time_t now;
         
@@ -1336,11 +1338,6 @@ static int _tlog_write_ext(struct tlog_log *log, struct tlog_loginfo *info, cons
         }
     }
     return len;
-}
-
-static inline int _tlog_write(struct tlog_log *log, const char *buff, int bufflen)
-{
-    return _tlog_write_ext(log, NULL, buff, bufflen);
 }
 
 int tlog_write(struct tlog_log *log, const char *buff, int bufflen)
@@ -1611,7 +1608,7 @@ static int _tlog_root_write_log(struct tlog_log *log, const char *buff, int buff
         if (log->segment_log) {
             head = (struct tlog_segment_log_head *)buff;
             _tlog_root_write_screen_log(log, &head->info, head->data, head->len);
-            return _tlog_write_ext(log, &head->info, head->data, head->len);
+            return _tlog_write(log, head->data, head->len);
         }
         _tlog_root_write_screen_log(log, NULL, buff, bufflen);
         return _tlog_write(log, buff, bufflen);
@@ -1619,8 +1616,8 @@ static int _tlog_root_write_log(struct tlog_log *log, const char *buff, int buff
 
     if (log->segment_log && tlog.root == log) {
         head = (struct tlog_segment_log_head *)buff;
-        _tlog_root_write_screen_log(log, &head->info, head->data, head->len - 1);
-        return tlog.output_func(&head->info, head->data, head->len - 1, tlog_get_private(log));
+        _tlog_root_write_screen_log(log, &head->info, head->data, head->len);
+        return tlog.output_func(&head->info, head->data, head->len, tlog_get_private(log));
     }
 
     _tlog_root_write_screen_log(log, NULL, buff, bufflen);
@@ -1677,7 +1674,7 @@ static void *_tlog_work(void *arg)
         log_len = 0;
         log_extlen = 0;
         log_extend = 0;
-        if (tlog.run == 0) {
+        if (__atomic_load_n(&tlog.run, __ATOMIC_RELAXED) == 0) {
             if (_tlog_any_has_data() == 0) {
                 break;
             }
@@ -1697,11 +1694,11 @@ static void *_tlog_work(void *arg)
         }
 
         /* if buffer is empty, wait */
-        if (_tlog_any_has_data_locked() == 0 && tlog.run) {
+        if (_tlog_any_has_data_locked() == 0 && __atomic_load_n(&tlog.run, __ATOMIC_RELAXED)) {
             log = _tlog_wait_log_locked(log);
             if (log == NULL) {
                 pthread_mutex_unlock(&tlog.lock);
-                if (errno != ETIMEDOUT && tlog.run) {
+                if (errno != ETIMEDOUT && __atomic_load_n(&tlog.run, __ATOMIC_RELAXED)) {
                     sleep(1);
                 }
                 continue;
@@ -1799,7 +1796,7 @@ void tlog_setlogscreen(int enable)
     _tlog_log_setlogscreen(tlog.root, enable);
 }
 
-int tlog_write_log(char *buff, int bufflen)
+int tlog_write_log(const char *buff, int bufflen)
 {
     if (unlikely(tlog.root == NULL)) {
         return -1;
@@ -1839,7 +1836,12 @@ int tlog_reg_output_func(tlog_log *log, tlog_output_func output)
         return -1;
     }
 
-    return _tlog_reg_output_func(log, output);
+    int ret =  _tlog_reg_output_func(log, output);
+    if (ret == 0) {
+        log->set_custom_output_func = 1;
+    }
+
+    return ret;
 }
 
 int tlog_reg_format_func(tlog_format_func callback)
@@ -1852,6 +1854,7 @@ int tlog_reg_log_output_func(tlog_log_output_func output, void *private_data)
 {
     tlog.output_func = output;
     tlog_set_private(tlog.root, private_data);
+    tlog.log->set_custom_output_func = 1;
     return 0;
 }
 
@@ -1917,7 +1920,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
 {
     struct tlog_log *log = NULL;
 
-    if (tlog.run == 0) {
+    if (__atomic_load_n(&tlog.run, __ATOMIC_RELAXED) == 0) {
         fprintf(stderr, "tlog: tlog is not initialized.\n");
         return NULL;
     }
@@ -1953,7 +1956,7 @@ tlog_log *tlog_open(const char *logfile, int maxlogsize, int maxlogcount, int bu
     log->output_func = _tlog_write;
     log->file_perm = S_IRUSR | S_IWUSR | S_IRGRP;
     log->archive_perm = S_IRUSR | S_IRGRP;
-
+    
     if (log->nocompress == 0 && tlog.gzip_cmd[0] == '\0') {
         log->nocompress = 1;
     }
@@ -2098,7 +2101,7 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize
     pthread_attr_init(&attr);
     pthread_cond_init(&tlog.cond, NULL);
     pthread_mutex_init(&tlog.lock, NULL);
-    tlog.run = 1;
+    __atomic_store_n(&tlog.run, 1, __ATOMIC_RELAXED);
 
     log = tlog_open(logfile, maxlogsize, maxlogcount, buffsize, flag);
     if (log == NULL) {
@@ -2128,14 +2131,14 @@ int tlog_init(const char *logfile, int maxlogsize, int maxlogcount, int buffsize
 errout:
     if (tlog.tid) {
         void *retval = NULL;
-        tlog.run = 0;
+        __atomic_store_n(&tlog.run, 0, __ATOMIC_RELAXED);
         pthread_join(tlog.tid, &retval);
         tlog.tid = 0;
     }
 
     pthread_cond_destroy(&tlog.cond);
     pthread_mutex_destroy(&tlog.lock);
-    tlog.run = 0;
+    __atomic_store_n(&tlog.run, 0, __ATOMIC_RELAXED);
     tlog.root = NULL;
     tlog.root_format = NULL;
 
@@ -2152,7 +2155,7 @@ void tlog_exit(void)
 
     if (tlog.tid) {
         void *ret = NULL;
-        tlog.run = 0;
+        __atomic_store_n(&tlog.run, 0, __ATOMIC_RELAXED);
         pthread_mutex_lock(&tlog.lock);
         pthread_cond_signal(&tlog.cond);
         pthread_mutex_unlock(&tlog.lock);
